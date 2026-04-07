@@ -182,7 +182,7 @@ def fetch(
         since=since,
         until=until,
     )
-    repos, commits = run_fetch(config, cache_dir)
+    repos, commits, _account_type = run_fetch(config, cache_dir)
     console.print(f"[green]Fetched {len(commits)} commits from {len(repos)} repos.[/green]")
 
 
