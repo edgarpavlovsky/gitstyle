@@ -85,12 +85,3 @@ echo -e "\033[1;32m✓ Wiki generated at wiki/\033[0m"
 echo "  10 articles across 4 repos"
 echo ""
 
-# Show output
-echo -e "\033[2m# Browse the wiki:\033[0m"
-echo "ls wiki/"
-sleep 0.3
-echo ""
-echo "_meta/                 commit-hygiene.md      dependencies.md        languages/"
-echo "code-structure.md      comments-and-docs.md   index.md               naming-conventions.md"
-echo "patterns.md            testing.md             type-discipline.md"
-echo ""

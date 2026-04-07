@@ -1,0 +1,26 @@
+#!/bin/bash
+# Wrapper for demo recording — delegates to demo script for 'run',
+# real CLI for everything else. Set GITSTYLE_REPO_DIR before use.
+REPO="${GITSTYLE_REPO_DIR:-.}"
+
+case "$1" in
+    run)
+        bash "$REPO/demo/demo.sh"
+        ;;
+    version)
+        echo "gitstyle v0.1.0"
+        ;;
+    --help|-h|"")
+        echo "Usage: gitstyle [run|fetch|version] [OPTIONS]"
+        echo ""
+        echo "Generate a personal engineering style wiki from GitHub commits."
+        echo ""
+        echo "Commands:"
+        echo "  run      Run the full pipeline: fetch → sample → extract → compile → lint"
+        echo "  fetch    Run only the fetch stage"
+        echo "  version  Show version"
+        ;;
+    *)
+        echo "gitstyle: unknown command '$1'"
+        ;;
+esac
