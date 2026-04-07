@@ -38,7 +38,7 @@ pip install -e .
 
 ```bash
 # Generate your engineering style wiki
-gitstyle run edgarpavlovsky
+gitstyle run karpathy
 
 # Output lands in wiki/ by default
 ls wiki/
@@ -214,7 +214,7 @@ Delete `.gitstyle/` to start fresh, or delete individual cache files to re-run s
 
 See the `examples/` directory for complete wiki outputs:
 
-- [`examples/edgarpavlovsky/`](examples/edgarpavlovsky/) — The author's engineering style wiki
+- [`examples/karpathy/`](examples/karpathy/) — Andrej Karpathy's Python + C style (nanoGPT, llm.c, micrograd)
 - [`examples/torvalds/`](examples/torvalds/) — Linus Torvalds' kernel C style
 
 ## Development

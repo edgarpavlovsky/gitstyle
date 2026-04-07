@@ -18,7 +18,7 @@ Sleep 300ms
 Type "export PATH=/tmp:$PATH"
 Enter
 Sleep 300ms
-Type "mkdir -p wiki/_meta wiki/languages && cp examples/edgarpavlovsky/*.md wiki/ && cp examples/edgarpavlovsky/_meta/*.md wiki/_meta/ && cp examples/edgarpavlovsky/languages/*.md wiki/languages/ 2>/dev/null"
+Type "mkdir -p wiki/_meta wiki/languages && cp examples/karpathy/*.md wiki/ && cp examples/karpathy/_meta/*.md wiki/_meta/ && cp examples/karpathy/languages/*.md wiki/languages/ 2>/dev/null"
 Enter
 Sleep 500ms
 Type "clear"
@@ -31,7 +31,7 @@ Sleep 500ms
 Enter
 Sleep 1s
 
-Type "gitstyle run edgarpavlovsky"
+Type "gitstyle run karpathy"
 Sleep 1s
 Enter
 Sleep 17s
