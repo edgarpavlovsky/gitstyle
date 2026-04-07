@@ -140,7 +140,12 @@ def run(
         f"Clusters formed: {len(clusters)}",
         f"Articles written: {len(articles)}",
     ]
-    write_meta(config.model_dump(mode="json"), stats, log_entries, config.output_dir)
+    write_meta(
+        config.model_dump(mode="json", exclude={"fetch": {"token"}, "llm": {"api_key"}}),
+        stats,
+        log_entries,
+        config.output_dir,
+    )
 
     console.print(f"\n[bold green]✓ Wiki generated at {config.output_dir}/[/bold green]")
     console.print(f"  {len(articles)} articles across {len(repos)} repos")
