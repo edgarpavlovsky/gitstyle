@@ -8,7 +8,7 @@ last_updated: 2026-04-07
 
 ```yaml
 user: karpathy
-model: claude-sonnet-4-20250514
+model: claude-opus-4-20250514
 output_dir: wiki/
 max_commits: 400
 repos: null  # auto-discover
@@ -22,8 +22,8 @@ sample_size: 20
 
 | Setting | Value |
 |---------|-------|
-| gitstyle version | 0.1.0 |
-| LLM model | claude-sonnet-4-20250514 |
+| gitstyle version | 0.2.0 |
+| LLM model | claude-opus-4-20250514 |
 | Max commits per repo | 400 |
 | Sample size per cluster | 20 |
 | Sample strategy | balanced (recent + largest + random) |
