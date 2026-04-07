@@ -289,6 +289,44 @@ body {
 }
 .wikilink:hover { border-bottom-style: solid; }
 
+/* Related articles */
+.article-related {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.article-related h3 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.related-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.related-chip {
+  padding: 6px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.related-chip:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
 /* CDN error banner */
 .cdn-error {
   position: fixed;
@@ -323,7 +361,7 @@ body {
     <div class="sidebar-nav" id="sidebar-nav"></div>
     <div class="view-toggle">
       <button class="view-btn active" id="btn-graph" onclick="showView('graph')">Graph</button>
-      <button class="view-btn" id="btn-article" onclick="showView('article')">Articles</button>
+      <button class="view-btn" id="btn-article" onclick="showView('article')">Reader</button>
     </div>
   </div>
 
@@ -483,9 +521,25 @@ body {
       html = `<pre style="white-space:pre-wrap">${md}</pre>`;
     }
 
+    // Related articles
+    let relatedHtml = '';
+    const related = meta.related || [];
+    const wikilinks = meta.wikilinks || [];
+    const allRelated = [...new Set([...related, ...wikilinks])].filter(s => s !== currentSlug && files.some(f => f.slug === s));
+    if (allRelated.length) {
+      relatedHtml = '<div class="article-related"><h3>Related</h3><div class="related-chips">';
+      for (const slug of allRelated) {
+        const f = files.find(ff => ff.slug === slug);
+        const title = f ? f.title : slug;
+        relatedHtml += `<span class="related-chip" onclick="loadArticle('${slug}')">${title}</span>`;
+      }
+      relatedHtml += '</div></div>';
+    }
+
     container.innerHTML = `
       <div class="article-meta">${badges}</div>
       <div class="article-content">${html}</div>
+      ${relatedHtml}
     `;
 
     // Syntax highlighting
@@ -543,12 +597,20 @@ body {
       .force('center', d3.forceCenter(0, 0))
       .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 4));
 
+    // SVG defs for glow
+    const defs = svg.append('defs');
+    const glow = defs.append('filter').attr('id', 'glow');
+    glow.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'blur');
+    glow.append('feMerge').selectAll('feMergeNode')
+      .data(['blur', 'SourceGraphic']).join('feMergeNode')
+      .attr('in', d => d);
+
     // Edges
     const link = g.append('g')
       .selectAll('line')
       .data(edges)
       .join('line')
-      .attr('stroke', 'rgba(48, 54, 61, 0.6)')
+      .attr('stroke', 'rgba(48, 54, 61, 0.5)')
       .attr('stroke-width', 1);
 
     // Nodes
@@ -560,6 +622,7 @@ body {
       .attr('fill', d => COLORS[d.category] || COLORS.other)
       .attr('stroke', 'none')
       .attr('cursor', 'pointer')
+      .attr('filter', d => d.category === 'index' ? 'url(#glow)' : null)
       .call(d3.drag()
         .on('start', dragStart)
         .on('drag', dragging)
