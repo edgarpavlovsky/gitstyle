@@ -29,6 +29,10 @@ The kernel maintains its own crypto implementations under `crypto/` and `lib/cry
 
 Binary firmware blobs are the one external dependency the kernel reluctantly accepts, housed in the separate `linux-firmware` repository. Torvalds has been vocal about preferring open firmware but pragmatic about hardware vendor realities. The `request_firmware()` API isolates firmware loading from driver logic — see [[patterns]] for the callback pattern used here.
 
+## In-Tree Data Structures
+
+The kernel implements its own linked lists (`list_head`), red-black trees (`rbtree`), hash tables, radix trees, and XArrays rather than using any external data structure library. These implementations are tuned for kernel-specific access patterns — for example, `list_head` is intrusive (embedded in the containing struct) to avoid separate allocation. See [[patterns]] for `container_of` usage with these structures. [f1a3d7e](https://github.com/torvalds/linux/commit/f1a3d7e)
+
 ## Compiler Requirements
 
 The kernel tracks a specific minimum GCC version (and now supports Clang/LLVM). Compiler features are used only after they're available in the minimum supported version. New C standard features are adopted conservatively — see [[languages/c]] for which C features are permitted. [d9c2f1e](https://github.com/torvalds/linux/commit/d9c2f1e)
