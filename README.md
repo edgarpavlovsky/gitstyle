@@ -6,6 +6,8 @@ Generate a personal engineering style wiki from your GitHub commit history.
 
 Inspired by [Karpathy's post on LLM Knowledge Bases](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — the idea that an LLM works best when it has a structured, personal knowledge base to draw from.
 
+![gitstyle demo](demo/demo.gif)
+
 ## Why
 
 Every developer has a style: naming conventions, error handling patterns, testing philosophy, commit hygiene, preferred libraries. When you bring a coding agent into your workflow, it starts from zero. **gitstyle** fixes that by mining your real commit history for patterns and packaging them as a wiki any agent can read.
