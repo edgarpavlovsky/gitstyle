@@ -14,3 +14,7 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+*.key
+*.pem
+*.p12
+.env.*

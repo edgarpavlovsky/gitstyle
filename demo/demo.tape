@@ -7,7 +7,7 @@ Set Theme "Catppuccin Mocha"
 Set Padding 20
 
 Hide
-Type "export GITSTYLE_REPO_DIR=/path/to/gitstyle"
+Type "export GITSTYLE_REPO_DIR=$(git rev-parse --show-toplevel)"
 Enter
 Type "cd $GITSTYLE_REPO_DIR"
 Enter
