@@ -24,7 +24,7 @@ STYLE_CATEGORIES = {
     "commit-hygiene": "Commit Hygiene",
 }
 
-SYSTEM_PROMPT = """\
+SYSTEM_PROMPT_INDIVIDUAL = """\
 You are compiling a developer's engineering style wiki from structured observations \
 extracted from their GitHub commit history.
 
@@ -47,13 +47,50 @@ Return a JSON object with:
 - sources: array of repo names that contributed observations
 - related: array of other article slugs that are referenced"""
 
+SYSTEM_PROMPT_ORG = """\
+You are compiling an engineering style wiki for a GitHub organization from structured \
+observations extracted from their repositories' commit history.
 
-LANGUAGE_SYSTEM_PROMPT = """\
+You will receive a set of observations for a specific style category, collected across \
+the organization's repositories. Synthesize them into a clear, well-structured wiki article \
+about this organization's engineering patterns and conventions.
+
+Requirements:
+- Write about the organization's patterns ("The org standardizes..." or "Across repos, the convention is...")
+- Cite specific commits using [SHA] notation where applicable
+- Use markdown formatting with headers, bullet points, and code examples where helpful
+- Note confidence levels and flag any contradictions between repos
+- Use [[wikilinks]] to cross-reference other style dimension articles
+- Be specific and concrete, not generic
+
+Return a JSON object with:
+- title: article title
+- content: full markdown content (without frontmatter — that's added separately)
+- confidence: overall confidence ("low", "medium", "high")
+- sources: array of repo names that contributed observations
+- related: array of other article slugs that are referenced"""
+
+LANGUAGE_SYSTEM_PROMPT_INDIVIDUAL = """\
 You are compiling a language-specific style guide from a developer's GitHub commit history. \
 You will receive observations specific to a programming language.
 
 Write a focused wiki article covering this developer's idioms, patterns, and conventions \
 in this language. Reference specific commits and cross-link to the core style dimension articles.
+
+Return a JSON object with:
+- title: article title (e.g. "Python Style")
+- content: full markdown content
+- confidence: overall confidence
+- sources: array of repo names
+- related: array of related article slugs"""
+
+LANGUAGE_SYSTEM_PROMPT_ORG = """\
+You are compiling a language-specific style guide for a GitHub organization. \
+You will receive observations specific to a programming language across the org's repos.
+
+Write a focused wiki article covering this organization's shared idioms, patterns, and \
+conventions in this language. Reference specific commits and cross-link to the core style \
+dimension articles.
 
 Return a JSON object with:
 - title: article title (e.g. "Python Style")
@@ -104,6 +141,7 @@ def compile_category_article(
     observations: list[StyleObservation],
     llm: LLMClient,
     cache_dir: Path | None = None,
+    context_type: str = "individual",
 ) -> WikiArticle:
     """Compile observations for one category into a wiki article."""
     if cache_dir:
@@ -112,7 +150,8 @@ def compile_category_article(
             return WikiArticle.model_validate_json(cache_path.read_text())
 
     prompt = _format_observations_prompt(category_name, observations)
-    raw = llm.complete_json(SYSTEM_PROMPT, prompt, max_tokens=4096)
+    system = SYSTEM_PROMPT_ORG if context_type == "organization" else SYSTEM_PROMPT_INDIVIDUAL
+    raw = llm.complete_json(system, prompt, max_tokens=4096)
 
     sources = list({obs.cluster_label.rsplit(":", 1)[0] for obs in observations})
 
@@ -139,6 +178,7 @@ def compile_language_article(
     observations: list[StyleObservation],
     llm: LLMClient,
     cache_dir: Path | None = None,
+    context_type: str = "individual",
 ) -> WikiArticle:
     """Compile language-specific observations into a wiki article."""
     slug = language.lower().replace(" ", "-")
@@ -149,7 +189,8 @@ def compile_language_article(
             return WikiArticle.model_validate_json(cache_path.read_text())
 
     prompt = _format_observations_prompt(language, observations)
-    raw = llm.complete_json(LANGUAGE_SYSTEM_PROMPT, prompt, max_tokens=4096)
+    lang_system = LANGUAGE_SYSTEM_PROMPT_ORG if context_type == "organization" else LANGUAGE_SYSTEM_PROMPT_INDIVIDUAL
+    raw = llm.complete_json(lang_system, prompt, max_tokens=4096)
 
     sources = list({obs.cluster_label.rsplit(":", 1)[0] for obs in observations})
 
@@ -175,6 +216,7 @@ def run_compile(
     extractions: list[StyleExtractionResult],
     llm_config: LLMConfig,
     cache_dir: Path | None = None,
+    context_type: str = "individual",
 ) -> list[WikiArticle]:
     """Compile all observations into wiki articles."""
     llm = LLMClient(llm_config)
@@ -189,7 +231,7 @@ def run_compile(
         if not observations:
             continue
         console.print(f"  Writing {slug}...")
-        article = compile_category_article(slug, display_name, observations, llm, cache_dir)
+        article = compile_category_article(slug, display_name, observations, llm, cache_dir, context_type=context_type)
         articles.append(article)
 
     # Language-idioms get folded into language-specific articles
@@ -204,7 +246,7 @@ def run_compile(
         if len(observations) < 2:  # Skip languages with very few observations
             continue
         console.print(f"  Writing languages/{lang}...")
-        article = compile_language_article(lang, observations, llm, cache_dir)
+        article = compile_language_article(lang, observations, llm, cache_dir, context_type=context_type)
         articles.append(article)
 
     console.print(f"[green]Compiled {len(articles)} wiki articles.[/green]")

@@ -26,6 +26,7 @@ def _build_config(
     model: str = "claude-sonnet-4-20250514",
     include_forks: bool = False,
     max_commits: int = 200,
+    max_repos: int = 30,
     max_samples: int = 20,
     since: Optional[str] = None,
     until: Optional[str] = None,
@@ -40,6 +41,7 @@ def _build_config(
             include_repos=include_repos,
             exclude_repos=exclude_repos,
             max_commits_per_repo=max_commits,
+            max_repos=max_repos,
             since=since,
             until=until,
         ),
@@ -52,12 +54,13 @@ def _build_config(
 
 @app.command()
 def run(
-    username: str = typer.Argument(help="GitHub username to analyze"),
+    username: str = typer.Argument(help="GitHub username or organization to analyze"),
     output_dir: Path = typer.Option(Path("wiki"), "--output", "-o", help="Output directory for wiki"),
     cache_dir: Path = typer.Option(Path(".gitstyle"), "--cache", help="Cache directory"),
     model: str = typer.Option("claude-sonnet-4-20250514", "--model", "-m", help="LLM model to use"),
     include_forks: bool = typer.Option(False, "--forks", help="Include forked repos"),
     max_commits: int = typer.Option(200, "--max-commits", help="Max commits per repo"),
+    max_repos: int = typer.Option(30, "--max-repos", help="Max repos to analyze (sorted by stars for orgs)"),
     max_samples: int = typer.Option(20, "--max-samples", help="Max samples per cluster"),
     since: Optional[str] = typer.Option(None, "--since", help="Fetch commits after this date (ISO format)"),
     until: Optional[str] = typer.Option(None, "--until", help="Fetch commits before this date (ISO format)"),
@@ -81,6 +84,7 @@ def run(
         model=model,
         include_forks=include_forks,
         max_commits=max_commits,
+        max_repos=max_repos,
         max_samples=max_samples,
         since=since,
         until=until,
@@ -90,11 +94,19 @@ def run(
     )
 
     console.print(f"\n[bold cyan]gitstyle v{__version__}[/bold cyan]")
-    console.print(f"Analyzing [bold]{username}[/bold]'s engineering style...\n")
+    console.print(f"Analyzing [bold]{username}[/bold]...\n")
 
-    # Stage 1: Fetch
+    # Stage 1: Fetch (auto-detects user vs org)
     console.rule("[bold]Stage 1: Fetch[/bold]")
-    repos, commits = run_fetch(config.fetch, config.cache_dir)
+    repos, commits, account_type = run_fetch(config.fetch, config.cache_dir)
+    context_type = "organization" if account_type == "Organization" else "individual"
+    config.context_type = context_type
+
+    if context_type == "organization":
+        console.print(f"[bold cyan]Detected organization — analyzing org engineering patterns[/bold cyan]")
+    else:
+        console.print(f"Analyzing [bold]{username}[/bold]'s engineering style...")
+
     if not commits:
         console.print("[red]No commits found. Check the username and try again.[/red]")
         raise typer.Exit(1)
@@ -107,11 +119,11 @@ def run(
 
     # Stage 3: Extract
     console.rule("[bold]Stage 3: Extract[/bold]")
-    extractions = run_extract(clusters, config.llm, config.cache_dir)
+    extractions = run_extract(clusters, config.llm, config.cache_dir, context_type=context_type)
 
     # Stage 4: Compile
     console.rule("[bold]Stage 4: Compile[/bold]")
-    articles = run_compile(extractions, config.llm, config.cache_dir)
+    articles = run_compile(extractions, config.llm, config.cache_dir, context_type=context_type)
 
     # Stage 5: Lint
     if not skip_lint:

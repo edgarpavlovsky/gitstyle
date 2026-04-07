@@ -18,6 +18,7 @@ class FetchConfig(BaseModel):
     include_forks: bool = False
     include_contributions: bool = False
     max_commits_per_repo: int = 200
+    max_repos: int = 30
     since: str | None = None
     until: str | None = None
 
@@ -46,3 +47,4 @@ class PipelineConfig(BaseModel):
     llm: LLMConfig = LLMConfig()
     output_dir: Path = Path("wiki")
     cache_dir: Path = Path(".gitstyle")
+    context_type: str = "individual"  # "individual" or "organization"

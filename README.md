@@ -2,7 +2,7 @@
 
 Generate a personal engineering style wiki from your GitHub commit history.
 
-**gitstyle** ingests a developer's GitHub commits and compiles them into a portable markdown wiki that any coding agent (Claude Code, Cursor, Aider, etc.) can load as context to write code in that developer's style.
+**gitstyle** ingests a developer's or organization's GitHub commits and compiles them into a portable markdown wiki that any coding agent (Claude Code, Cursor, Aider, etc.) can load as context to write code in that style.
 
 Inspired by [Karpathy's post on LLM Knowledge Bases](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — the idea that an LLM works best when it has a structured, personal knowledge base to draw from.
 
@@ -10,7 +10,9 @@ Inspired by [Karpathy's post on LLM Knowledge Bases](https://gist.github.com/kar
 
 ## Why
 
-Every developer has a style: naming conventions, error handling patterns, testing philosophy, commit hygiene, preferred libraries. When you bring a coding agent into your workflow, it starts from zero. **gitstyle** fixes that by mining your real commit history for patterns and packaging them as a wiki any agent can read.
+Every developer and engineering org has a style: naming conventions, error handling patterns, testing philosophy, commit hygiene, preferred libraries. When you bring a coding agent into your workflow, it starts from zero. **gitstyle** fixes that by mining real commit history for patterns and packaging them as a wiki any agent can read.
+
+Works for individual developers and GitHub organizations — gitstyle auto-detects which and adjusts its analysis accordingly.
 
 The output is plain markdown — no tool lock-in, no proprietary format. It works with Obsidian for browsing, with any coding agent for context, or as standalone documentation of your engineering preferences.
 
@@ -37,8 +39,11 @@ pip install -e .
 ## Quickstart
 
 ```bash
-# Generate your engineering style wiki
+# Generate a developer's engineering style wiki
 gitstyle run karpathy
+
+# Or generate an org's engineering patterns wiki
+gitstyle run anthropic --max-repos 30
 
 # Output lands in wiki/ by default
 ls wiki/
@@ -185,6 +190,7 @@ gitstyle version
 | `--model, -m` | `claude-sonnet-4-20250514` | LLM model |
 | `--forks` | `false` | Include forked repos |
 | `--max-commits` | `200` | Max commits per repo |
+| `--max-repos` | `30` | Max repos to analyze (sorted by stars for orgs) |
 | `--max-samples` | `20` | Max samples per cluster |
 | `--since` | — | Start date (ISO 8601) |
 | `--until` | — | End date (ISO 8601) |
@@ -214,8 +220,13 @@ Delete `.gitstyle/` to start fresh, or delete individual cache files to re-run s
 
 See the `examples/` directory for complete wiki outputs:
 
+### Individual developers
 - [`examples/karpathy/`](examples/karpathy/) — Andrej Karpathy's Python + C style (nanoGPT, llm.c, micrograd)
 - [`examples/torvalds/`](examples/torvalds/) — Linus Torvalds' kernel C style
+
+### Organizations
+- [`examples/anthropic/`](examples/anthropic/) — Anthropic's SDK and developer tools patterns (anthropic-sdk-python, anthropic-cookbook, claude-code)
+- [`examples/openai/`](examples/openai/) — OpenAI's SDK + research code patterns (openai-python, tiktoken, whisper, CLIP)
 
 ## Development
 

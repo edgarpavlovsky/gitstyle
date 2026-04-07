@@ -50,6 +50,12 @@ class GitHubClient:
             params = {}  # params are baked into the next URL
         return results
 
+    def get_account_type(self, name: str) -> str:
+        """Check if a GitHub name is a 'User' or 'Organization'."""
+        resp = self._client.get(f"/users/{name}")
+        resp.raise_for_status()
+        return resp.json().get("type", "User")
+
     def get_user_repos(
         self,
         username: str,
@@ -68,6 +74,31 @@ class GitHubClient:
                     description=r.get("description"),
                     language=r.get("language"),
                     is_fork=r.get("fork", False),
+                    stars=r.get("stargazers_count", 0),
+                    url=r.get("html_url", ""),
+                )
+            )
+        return repos
+
+    def get_org_repos(
+        self,
+        org: str,
+        include_forks: bool = False,
+    ) -> list[RepoInfo]:
+        """List repos owned by an organization, sorted by stars descending."""
+        raw = self._paginate(f"/orgs/{org}/repos", {"sort": "stars", "direction": "desc"})
+        repos = []
+        for r in raw:
+            if not include_forks and r.get("fork"):
+                continue
+            repos.append(
+                RepoInfo(
+                    name=r["name"],
+                    full_name=r["full_name"],
+                    description=r.get("description"),
+                    language=r.get("language"),
+                    is_fork=r.get("fork", False),
+                    stars=r.get("stargazers_count", 0),
                     url=r.get("html_url", ""),
                 )
             )
@@ -144,16 +175,29 @@ class GitHubClient:
         include_repos: list[str] | None = None,
         exclude_repos: list[str] | None = None,
         max_commits_per_repo: int = 200,
+        max_repos: int = 0,
         since: str | None = None,
         until: str | None = None,
-    ) -> tuple[list[RepoInfo], list[Commit]]:
-        """Fetch all repos and commits for a user. Returns (repos, commits)."""
-        repos = self.get_user_repos(username, include_forks=include_forks)
+    ) -> tuple[list[RepoInfo], list[Commit], str]:
+        """Fetch all repos and commits for a user or org.
+
+        Returns (repos, commits, account_type) where account_type is 'User' or 'Organization'.
+        """
+        account_type = self.get_account_type(username)
+
+        if account_type == "Organization":
+            repos = self.get_org_repos(username, include_forks=include_forks)
+        else:
+            repos = self.get_user_repos(username, include_forks=include_forks)
 
         if include_repos:
             repos = [r for r in repos if r.name in include_repos]
         if exclude_repos:
             repos = [r for r in repos if r.name not in exclude_repos]
+
+        # Cap repos (sorted by stars for orgs, already sorted by pushed for users)
+        if max_repos > 0:
+            repos = repos[:max_repos]
 
         all_commits: list[Commit] = []
         with Progress(
@@ -180,4 +224,4 @@ class GitHubClient:
                     pass
                 progress.advance(task)
 
-        return repos, all_commits
+        return repos, all_commits, account_type

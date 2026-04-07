@@ -14,6 +14,7 @@ class RepoInfo(BaseModel):
     language: str | None = None
     languages: dict[str, int] = Field(default_factory=dict)
     is_fork: bool = False
+    stars: int = 0
     url: str = ""
 
 

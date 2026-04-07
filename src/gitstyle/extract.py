@@ -25,7 +25,7 @@ STYLE_CATEGORIES = [
     "language-idioms",
 ]
 
-EXTRACT_SYSTEM = """You are an expert code analyst. You examine Git commits and extract observations about a developer's engineering style.
+EXTRACT_SYSTEM_INDIVIDUAL = """You are an expert code analyst. You examine Git commits and extract observations about a developer's engineering style.
 
 Given a cluster of commits from one repo/language, analyze them and produce structured observations.
 
@@ -45,7 +45,27 @@ Output ONLY a JSON array of observation objects. No markdown, no explanation. Ex
   }}
 ]"""
 
-EXTRACT_USER = """Cluster: {label}
+EXTRACT_SYSTEM_ORG = """You are an expert code analyst. You examine Git commits and extract observations about an organization's engineering patterns and conventions.
+
+Given a cluster of commits from one repo/language within this organization, analyze them and produce structured observations about the org's shared engineering style.
+
+For each observation, provide:
+- category: one of {categories}
+- observation: a clear, specific description of the pattern you see across the org
+- evidence: list of commit SHAs that support this observation
+- confidence: low, medium, or high
+
+Output ONLY a JSON array of observation objects. No markdown, no explanation. Example:
+[
+  {{
+    "category": "naming-conventions",
+    "observation": "The org uses snake_case for Python functions and PascalCase for classes across all repos",
+    "evidence": ["abc1234", "def5678"],
+    "confidence": "high"
+  }}
+]"""
+
+EXTRACT_USER_INDIVIDUAL = """Cluster: {label}
 Repository: {repo}
 Language: {language}
 
@@ -53,6 +73,15 @@ Commits ({count} total):
 {commits_text}
 
 Analyze these commits and extract observations about the developer's engineering style. Cover as many categories as the evidence supports: {categories}"""
+
+EXTRACT_USER_ORG = """Cluster: {label}
+Repository: {repo}
+Language: {language}
+
+Commits ({count} total):
+{commits_text}
+
+Analyze these commits and extract observations about this organization's engineering patterns and conventions. Cover as many categories as the evidence supports: {categories}"""
 
 
 def _format_commit(commit) -> str:
@@ -78,6 +107,7 @@ def extract_cluster(
     cluster: CommitCluster,
     llm: LLMClient,
     cache_dir: Path | None = None,
+    context_type: str = "individual",
 ) -> StyleExtractionResult:
     """Run LLM extraction on a single cluster."""
     # Check cache
@@ -90,8 +120,15 @@ def extract_cluster(
     if len(commits_text) > 80_000:
         commits_text = commits_text[:80_000] + "\n\n[... truncated]"
 
-    system = EXTRACT_SYSTEM.format(categories=", ".join(STYLE_CATEGORIES))
-    user = EXTRACT_USER.format(
+    if context_type == "organization":
+        system_tpl = EXTRACT_SYSTEM_ORG
+        user_tpl = EXTRACT_USER_ORG
+    else:
+        system_tpl = EXTRACT_SYSTEM_INDIVIDUAL
+        user_tpl = EXTRACT_USER_INDIVIDUAL
+
+    system = system_tpl.format(categories=", ".join(STYLE_CATEGORIES))
+    user = user_tpl.format(
         label=cluster.label,
         repo=cluster.repo,
         language=cluster.language or "mixed",
@@ -133,6 +170,7 @@ def run_extract(
     clusters: list[CommitCluster],
     llm_config: LLMConfig,
     cache_dir: Path,
+    context_type: str = "individual",
 ) -> list[StyleExtractionResult]:
     """Run extraction across all clusters."""
     llm = LLMClient(llm_config)
@@ -142,7 +180,7 @@ def run_extract(
         if not cluster.commits:
             continue
         console.print(f"[bold]Extracting [{i}/{len(clusters)}]: {cluster.label} ({len(cluster.commits)} commits)...[/bold]")
-        result = extract_cluster(cluster, llm, cache_dir)
+        result = extract_cluster(cluster, llm, cache_dir, context_type=context_type)
         console.print(f"  [green]{len(result.observations)} observations[/green]")
         results.append(result)
 
