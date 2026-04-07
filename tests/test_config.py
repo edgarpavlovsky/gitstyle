@@ -1,33 +1,32 @@
-"""Tests for configuration models."""
+"""Tests for configuration."""
 
+import tempfile
 from pathlib import Path
 
-from gitstyle.config import FetchConfig, LLMConfig, PipelineConfig, SampleConfig
+from gitstyle.config import GitStyleConfig
 
 
-def test_fetch_config_defaults():
-    config = FetchConfig(username="testuser")
-    assert config.max_commits_per_repo == 200
-    assert config.include_forks is False
-    assert config.include_repos is None
-    assert config.exclude_repos is None
+def test_config_defaults():
+    c = GitStyleConfig(username="testuser")
+    assert c.max_commits == 2000
+    assert c.samples_per_group == 20
+    assert c.output_dir == Path("wiki")
+    assert c.cache_dir == Path(".gitstyle")
+    assert c.dry_run is False
 
 
-def test_sample_config_defaults():
-    config = SampleConfig()
-    assert config.max_samples_per_cluster == 20
-    assert config.strategy == "balanced"
-    assert config.min_diff_lines == 5
+def test_config_paths():
+    c = GitStyleConfig(username="test", cache_dir=Path("/tmp/gs"))
+    assert c.commits_path() == Path("/tmp/gs/commits.jsonl")
+    assert c.samples_path() == Path("/tmp/gs/samples.json")
+    assert c.extractions_path() == Path("/tmp/gs/extractions.json")
+    assert c.articles_path() == Path("/tmp/gs/articles.json")
+    assert c.lint_path() == Path("/tmp/gs/lint.json")
 
 
-def test_llm_config_defaults():
-    config = LLMConfig()
-    assert "claude" in config.model.lower() or "sonnet" in config.model.lower()
-    assert config.max_tokens == 4096
-
-
-def test_pipeline_config():
-    config = PipelineConfig(fetch=FetchConfig(username="testuser"))
-    assert config.output_dir == Path("wiki")
-    assert config.cache_dir == Path(".gitstyle")
-    assert config.sample.max_samples_per_cluster == 20
+def test_ensure_cache_dir():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cache = Path(tmpdir) / "deep" / "cache"
+        c = GitStyleConfig(username="test", cache_dir=cache)
+        c.ensure_cache_dir()
+        assert cache.exists()

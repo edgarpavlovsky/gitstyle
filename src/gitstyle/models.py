@@ -1,88 +1,116 @@
-"""Data models for the gitstyle pipeline."""
+"""Pydantic models for the gitstyle pipeline."""
 
 from __future__ import annotations
+
+from datetime import datetime
+from enum import Enum
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
 
-class RepoInfo(BaseModel):
-    """Metadata about a GitHub repository."""
-
-    name: str
-    full_name: str
-    description: str | None = None
-    language: str | None = None
-    languages: dict[str, int] = Field(default_factory=dict)
-    is_fork: bool = False
-    stars: int = 0
-    url: str = ""
-
+# ---------------------------------------------------------------------------
+# Stage 1 – Fetch
+# ---------------------------------------------------------------------------
 
 class CommitFile(BaseModel):
-    """A file changed in a commit."""
-
     filename: str
-    status: str = ""  # added, modified, removed, renamed
+    status: str  # added, modified, removed, renamed
     additions: int = 0
     deletions: int = 0
-    patch: str | None = None
+    patch: Optional[str] = None
 
 
-class Commit(BaseModel):
-    """A single Git commit with metadata and diff."""
-
+class RawCommit(BaseModel):
     sha: str
-    repo: str  # full_name e.g. "edgarpavlovsky/project"
+    repo: str  # owner/name
     message: str
-    date: str
-    files: list[CommitFile] = Field(default_factory=list)
+    author: str
+    authored_at: datetime
     additions: int = 0
     deletions: int = 0
-    url: str = ""
+    files: list[CommitFile] = Field(default_factory=list)
+    languages: list[str] = Field(default_factory=list)
 
 
-class CommitCluster(BaseModel):
-    """A group of related commits for LLM analysis."""
+# ---------------------------------------------------------------------------
+# Stage 2 – Sample
+# ---------------------------------------------------------------------------
 
-    label: str  # e.g. "edgarpavlovsky/project:python"
+class CommitGroup(BaseModel):
     repo: str
-    language: str | None = None
-    commits: list[Commit] = Field(default_factory=list)
+    language: str
+    commits: list[RawCommit]
 
 
-class StyleObservation(BaseModel):
-    """A structured observation about engineering style from one cluster."""
+class SampledCluster(BaseModel):
+    repo: str
+    language: str
+    commits: list[RawCommit]
+    total_in_group: int
 
-    cluster_label: str
-    category: str  # one of the 9 style dimensions
-    observation: str
+
+# ---------------------------------------------------------------------------
+# Stage 3 – Extract
+# ---------------------------------------------------------------------------
+
+class StyleDimension(str, Enum):
+    CODE_STRUCTURE = "code-structure"
+    NAMING = "naming-conventions"
+    PATTERNS = "patterns"
+    TYPE_DISCIPLINE = "type-discipline"
+    TESTING = "testing"
+    COMMENTS_DOCS = "comments-and-docs"
+    DEPENDENCIES = "dependencies"
+    COMMIT_HYGIENE = "commit-hygiene"
+    LANGUAGE_IDIOMS = "language-idioms"
+
+
+class Observation(BaseModel):
+    dimension: StyleDimension
+    claim: str
     evidence: list[str] = Field(default_factory=list)  # commit SHAs
-    confidence: str = "medium"  # low, medium, high
+    confidence: float = Field(ge=0.0, le=1.0, default=0.7)
+    language: Optional[str] = None
 
 
-class StyleExtractionResult(BaseModel):
-    """All observations from a single cluster extraction."""
+class ClusterExtraction(BaseModel):
+    repo: str
+    language: str
+    observations: list[Observation]
 
-    cluster_label: str
-    observations: list[StyleObservation] = Field(default_factory=list)
 
+# ---------------------------------------------------------------------------
+# Stage 4 – Compile
+# ---------------------------------------------------------------------------
 
 class WikiArticle(BaseModel):
-    """A compiled wiki article ready to be written to disk."""
-
-    slug: str  # filename without .md
+    slug: str  # e.g. "code-structure"
     title: str
-    category: str
-    content: str
-    sources: list[str] = Field(default_factory=list)  # repo names
-    confidence: str = "medium"
-    related: list[str] = Field(default_factory=list)  # slugs of related articles
+    category: str  # "dimension" or "language"
+    confidence: float = Field(ge=0.0, le=1.0)
+    source_repos: list[str] = Field(default_factory=list)
+    content: str  # markdown body (no frontmatter)
+    wikilinks: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Stage 5 – Lint
+# ---------------------------------------------------------------------------
+
+class LintSeverity(str, Enum):
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
 
 
 class LintIssue(BaseModel):
-    """An issue found during the lint pass."""
-
     article: str  # slug
-    severity: str  # info, warning, error
+    severity: LintSeverity
     message: str
-    suggestion: str | None = None
+    suggestion: Optional[str] = None
+
+
+class LintReport(BaseModel):
+    issues: list[LintIssue] = Field(default_factory=list)
+    passed: bool = True

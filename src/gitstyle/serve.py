@@ -1,190 +1,214 @@
-"""Local web viewer for gitstyle wikis."""
+"""Local web viewer for gitstyle wikis — stdlib HTTP server, zero dependencies."""
 
 from __future__ import annotations
 
 import json
 import re
+from functools import lru_cache
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 
-def _parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
-    """Parse YAML frontmatter from markdown content."""
-    if not content.startswith("---"):
-        return {}, content
-    end = content.find("---", 3)
+def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
+    """Extract YAML frontmatter from markdown. Returns (metadata, body)."""
+    if not text.startswith("---"):
+        return {}, text
+    end = text.find("---", 3)
     if end == -1:
-        return {}, content
-    raw = content[3:end].strip()
-    body = content[end + 3:].strip()
+        return {}, text
+    raw = text[3:end].strip()
     meta: dict[str, Any] = {}
-    for line in raw.split("\n"):
+    current_key: str | None = None
+    current_list: list[str] | None = None
+    for line in raw.splitlines():
+        if line.startswith("  - ") and current_key and current_list is not None:
+            current_list.append(line[4:].strip())
+            continue
+        if current_key and current_list is not None:
+            meta[current_key] = current_list
+            current_list = None
+            current_key = None
         if ":" not in line:
             continue
-        key, val = line.split(":", 1)
+        key, _, val = line.partition(":")
         key = key.strip()
         val = val.strip()
-        # Parse simple YAML values
-        if val.startswith("[") and val.endswith("]"):
-            items = val[1:-1]
-            meta[key] = [s.strip().strip('"').strip("'") for s in items.split(",") if s.strip()]
-        elif val in ("true", "false"):
-            meta[key] = val == "true"
-        elif val.isdigit():
-            meta[key] = int(val)
+        if val == "":
+            current_key = key
+            current_list = []
         else:
-            meta[key] = val.strip('"').strip("'")
+            # Try numeric
+            try:
+                meta[key] = float(val) if "." in val else int(val)
+            except ValueError:
+                meta[key] = val
+    if current_key and current_list is not None:
+        meta[current_key] = current_list
+    body = text[end + 3:].strip()
     return meta, body
 
 
-def _extract_wikilinks(content: str) -> list[str]:
-    """Extract [[wikilink]] targets from markdown content."""
-    return re.findall(r"\[\[([^\]]+)\]\]", content)
+_WIKILINK_RE = re.compile(r"\[\[([^\]|]+?)(?:\|[^\]]+?)?\]\]")
 
 
-def _slug_from_path(filepath: Path, wiki_dir: Path) -> str:
-    """Convert a file path to a slug relative to wiki dir."""
-    rel = filepath.relative_to(wiki_dir)
-    return str(rel.with_suffix(""))
+def _extract_wikilinks(text: str) -> list[str]:
+    return _WIKILINK_RE.findall(text)
 
 
-def _scan_wiki(wiki_dir: Path) -> dict[str, dict[str, Any]]:
-    """Scan wiki directory and return file metadata keyed by slug."""
-    files: dict[str, dict[str, Any]] = {}
+def _scan_wiki(wiki_dir: Path) -> list[dict[str, Any]]:
+    """Scan wiki directory, return list of file metadata dicts."""
+    files = []
     for md in sorted(wiki_dir.rglob("*.md")):
-        slug = _slug_from_path(md, wiki_dir)
-        content = md.read_text(encoding="utf-8")
-        meta, body = _parse_frontmatter(content)
-        wikilinks = _extract_wikilinks(content)
-        related = meta.get("related", [])
-        if isinstance(related, str):
-            related = [related]
-        files[slug] = {
-            "slug": slug,
-            "title": meta.get("title", slug),
-            "category": meta.get("category", "other"),
-            "confidence": meta.get("confidence"),
-            "sources": meta.get("sources", []),
-            "related": related,
-            "wikilinks": wikilinks,
-            "last_updated": meta.get("last_updated"),
-        }
+        rel = md.relative_to(wiki_dir).as_posix()
+        text = md.read_text(encoding="utf-8")
+        meta, body = _parse_frontmatter(text)
+        files.append({
+            "path": rel,
+            "slug": md.stem,
+            "meta": meta,
+            "body": body,
+            "wikilinks": _extract_wikilinks(text),
+        })
     return files
 
 
-def _build_graph(files: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """Build graph nodes and edges from wiki files."""
+def _build_graph(files: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build graph data from scanned files."""
     nodes = []
     edges = []
-    slugs = set(files.keys())
-    edge_set: set[tuple[str, str]] = set()
+    slug_to_path: dict[str, str] = {}
 
-    for slug, info in files.items():
-        # Count links (wikilinks + related)
-        link_targets = set(info["wikilinks"]) | set(info["related"])
-        link_count = sum(1 for t in link_targets if t in slugs)
+    for f in files:
+        slug_to_path[f["slug"]] = f["path"]
+        # Also map path-without-extension
+        path_no_ext = f["path"].removesuffix(".md")
+        slug_to_path[path_no_ext] = f["path"]
+
+    for f in files:
+        cat = f["meta"].get("category", "meta")
+        link_count = len(f["wikilinks"])
+        # Also count incoming links
+        for other in files:
+            if f["path"] in other["wikilinks"] or f["slug"] in other["wikilinks"]:
+                link_count += 1
         nodes.append({
-            "id": slug,
-            "title": info["title"],
-            "category": info["category"],
-            "confidence": info["confidence"],
+            "id": f["path"],
+            "slug": f["slug"],
+            "title": f["meta"].get("title", f["slug"]),
+            "category": cat,
+            "confidence": f["meta"].get("confidence", 0),
             "links": link_count,
         })
-        # Edges from wikilinks
-        for target in info["wikilinks"]:
-            if target in slugs:
-                pair = tuple(sorted([slug, target]))
-                if pair not in edge_set:
-                    edge_set.add(pair)
-                    edges.append({"source": slug, "target": target})
-        # Edges from related
-        for target in info["related"]:
-            if target in slugs:
-                pair = tuple(sorted([slug, target]))
-                if pair not in edge_set:
-                    edge_set.add(pair)
-                    edges.append({"source": slug, "target": target})
 
-    return {"nodes": nodes, "edges": edges}
+        for link in f["wikilinks"]:
+            target = slug_to_path.get(link)
+            if not target:
+                target = slug_to_path.get(link.removesuffix(".md"))
+            if target and target != f["path"]:
+                edges.append({"source": f["path"], "target": target})
 
+        # Also add edges from `related` frontmatter
+        related = f["meta"].get("related", [])
+        if isinstance(related, list):
+            for r in related:
+                target = slug_to_path.get(r)
+                if target and target != f["path"]:
+                    edges.append({"source": f["path"], "target": target})
 
-def _make_handler(wiki_dir: Path, template: str) -> type:
-    """Create a request handler class with the wiki dir bound."""
-    files_cache = _scan_wiki(wiki_dir)
-    graph_cache = _build_graph(files_cache)
+    # Deduplicate edges
+    seen = set()
+    unique_edges = []
+    for e in edges:
+        key = (e["source"], e["target"])
+        rev = (e["target"], e["source"])
+        if key not in seen and rev not in seen:
+            seen.add(key)
+            unique_edges.append(e)
 
-    class WikiHandler(SimpleHTTPRequestHandler):
-        def log_message(self, format: str, *args: Any) -> None:
-            # Suppress default logging
-            pass
-
-        def _json_response(self, data: Any, status: int = 200) -> None:
-            body = json.dumps(data).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def _html_response(self, html: str) -> None:
-            body = html.encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def do_GET(self) -> None:
-            path = self.path.split("?")[0]
-
-            if path == "/api/files":
-                self._json_response(list(files_cache.values()))
-            elif path == "/api/graph":
-                self._json_response(graph_cache)
-            elif path.startswith("/api/file/"):
-                slug = path[len("/api/file/"):]
-                filepath = wiki_dir / f"{slug}.md"
-                if filepath.exists() and filepath.is_relative_to(wiki_dir):
-                    content = filepath.read_text(encoding="utf-8")
-                    meta = files_cache.get(slug, {})
-                    self._json_response({"content": content, "meta": meta})
-                else:
-                    self._json_response({"error": "Not found"}, 404)
-            else:
-                # Serve the SPA for any other path
-                self._html_response(template)
-
-    return WikiHandler
+    return {"nodes": nodes, "edges": unique_edges}
 
 
-def run_server(wiki_dir: Path, port: int = 8080, no_open: bool = False) -> None:
-    """Start the wiki viewer server."""
-    import webbrowser
+_VIEWER_HTML: str | None = None
 
-    if not wiki_dir.exists():
-        raise FileNotFoundError(f"Wiki directory not found: {wiki_dir}")
-    if not list(wiki_dir.rglob("*.md")):
-        raise FileNotFoundError(f"No markdown files found in {wiki_dir}")
 
-    template_path = Path(__file__).parent / "templates" / "viewer.html"
-    template = template_path.read_text(encoding="utf-8")
+def _get_viewer_html() -> str:
+    global _VIEWER_HTML
+    if _VIEWER_HTML is None:
+        viewer_path = Path(__file__).parent / "viewer.html"
+        _VIEWER_HTML = viewer_path.read_text(encoding="utf-8")
+    return _VIEWER_HTML
 
-    handler_class = _make_handler(wiki_dir, template)
-    server = HTTPServer(("127.0.0.1", port), handler_class)
 
-    from rich.console import Console
-    console = Console()
-    url = f"http://localhost:{port}"
-    console.print(f"\n[bold cyan]gitstyle viewer[/bold cyan]")
-    console.print(f"  Serving [bold]{wiki_dir}[/bold] at [link={url}]{url}[/link]")
-    console.print(f"  Press Ctrl+C to stop\n")
+class WikiHandler(SimpleHTTPRequestHandler):
+    wiki_dir: Path = Path("wiki")
 
-    if not no_open:
-        webbrowser.open(url)
+    def log_message(self, format: str, *args: Any) -> None:
+        # Suppress default logging noise
+        pass
 
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        console.print("\n[dim]Stopped.[/dim]")
-        server.server_close()
+    def _send_json(self, data: Any, status: int = 200) -> None:
+        body = json.dumps(data).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_html(self, html: str, status: int = 200) -> None:
+        body = html.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:
+        path = unquote(self.path)
+
+        if path == "/api/files":
+            files = _scan_wiki(self.wiki_dir)
+            # Strip body from list response to keep it light
+            result = []
+            for f in files:
+                result.append({
+                    "path": f["path"],
+                    "slug": f["slug"],
+                    "meta": f["meta"],
+                })
+            self._send_json(result)
+            return
+
+        if path.startswith("/api/file/"):
+            rel = path[len("/api/file/"):]
+            file_path = self.wiki_dir / rel
+            if not file_path.exists() or not file_path.is_file():
+                self._send_json({"error": "not found"}, 404)
+                return
+            # Prevent path traversal
+            try:
+                file_path.resolve().relative_to(self.wiki_dir.resolve())
+            except ValueError:
+                self._send_json({"error": "forbidden"}, 403)
+                return
+            text = file_path.read_text(encoding="utf-8")
+            meta, body = _parse_frontmatter(text)
+            self._send_json({"path": rel, "meta": meta, "body": body})
+            return
+
+        if path == "/api/graph":
+            files = _scan_wiki(self.wiki_dir)
+            graph = _build_graph(files)
+            self._send_json(graph)
+            return
+
+        # Default: serve viewer
+        self._send_html(_get_viewer_html())
+
+
+def start_server(wiki_dir: Path, port: int = 8080) -> HTTPServer:
+    """Create and return an HTTPServer (does not start serving)."""
+    WikiHandler.wiki_dir = wiki_dir.resolve()
+    server = HTTPServer(("127.0.0.1", port), WikiHandler)
+    return server

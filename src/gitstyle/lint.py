@@ -1,84 +1,108 @@
-"""Lint stage — LLM health check for contradictions and weak evidence."""
+"""Stage 5: Lint — LLM health check for wiki quality."""
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from rich.console import Console
 
-from gitstyle.config import LLMConfig
+from gitstyle.config import GitStyleConfig
 from gitstyle.llm_client import LLMClient
-from gitstyle.models import LintIssue, WikiArticle
+from gitstyle.models import LintIssue, LintReport, LintSeverity, WikiArticle
 
 console = Console()
 
-SYSTEM_PROMPT = """\
-You are a quality reviewer for an auto-generated engineering style wiki. \
-Review the wiki articles for:
+LINT_SYSTEM = """\
+You are a quality checker for a developer engineering style wiki. Review the wiki \
+articles for:
 
-1. **Contradictions**: Statements in one article that conflict with another
-2. **Weak evidence**: Claims that cite too few commits or seem speculative
-3. **Missing categories**: Important style dimensions that aren't covered
-4. **Vague statements**: Generic observations that could apply to any developer
-5. **Broken cross-references**: [[wikilinks]] that reference non-existent articles
+1. Contradictions — claims in one article that conflict with another
+2. Weak evidence — claims citing only 1 commit or with low confidence
+3. Missing categories — style dimensions that should be covered but aren't
+4. Vague claims — observations too generic to be useful
+5. Cross-reference errors — wikilinks to articles that don't exist
 
-For each issue found, return a JSON array of objects with:
-- article: slug of the affected article (or "general" for cross-cutting issues)
+For each issue found, provide:
+- article: the slug of the article with the issue
 - severity: "info", "warning", or "error"
-- message: clear description of the issue
-- suggestion: how to fix it (or null)
+- message: description of the issue
+- suggestion: how to fix it
 
-If the wiki is clean, return an empty array []."""
+Return valid JSON: {"issues": [...], "passed": true/false}\
+"""
 
 
-def _format_wiki_for_review(articles: list[WikiArticle]) -> str:
+def lint(articles: list[WikiArticle], config: GitStyleConfig) -> LintReport:
+    """Run LLM lint pass on compiled articles."""
+    config.ensure_cache_dir()
+    cache = config.lint_path()
+
+    if cache.exists():
+        console.print(f"[dim]Using cached lint from {cache}[/dim]")
+        return _load_lint(cache)
+
+    if not articles:
+        console.print("[yellow]No articles to lint[/yellow]")
+        return LintReport()
+
+    llm = LLMClient(model=config.llm_model)
+
+    console.print("[bold]Lint stage:[/bold] 1 LLM call")
+    if config.dry_run:
+        console.print("[yellow]Dry run — skipping LLM lint[/yellow]")
+        return LintReport()
+
+    prompt = _build_lint_prompt(articles)
+    try:
+        data = llm.complete_json(LINT_SYSTEM, prompt)
+        issues = [LintIssue.model_validate(i) for i in data.get("issues", [])]
+        report = LintReport(issues=issues, passed=data.get("passed", len(issues) == 0))
+    except Exception as e:
+        console.print(f"[red]  Lint error: {e}[/red]")
+        report = LintReport(
+            issues=[LintIssue(
+                article="_meta",
+                severity=LintSeverity.ERROR,
+                message=f"Lint failed: {e}",
+            )],
+            passed=False,
+        )
+
+    # Cache
+    with open(cache, "w") as f:
+        f.write(report.model_dump_json(indent=2))
+
+    _print_report(report)
+    return report
+
+
+def _build_lint_prompt(articles: list[WikiArticle]) -> str:
     lines = [f"Wiki contains {len(articles)} articles:\n"]
     existing_slugs = {a.slug for a in articles}
-
-    for article in articles:
-        lines.append(f"=== {article.slug}.md (category: {article.category}, confidence: {article.confidence}) ===")
-        lines.append(article.content)
+    for a in articles:
+        lines.append(f"## {a.slug} (confidence: {a.confidence:.0%})")
+        lines.append(f"Category: {a.category}")
+        lines.append(f"Wikilinks: {', '.join(a.wikilinks)}")
+        lines.append(a.content[:2000])  # cap for token budget
         lines.append("")
-
-    lines.append(f"\nAvailable article slugs: {', '.join(sorted(existing_slugs))}")
+    lines.append(f"\nExisting article slugs: {', '.join(sorted(existing_slugs))}")
     return "\n".join(lines)
 
 
-def run_lint(
-    articles: list[WikiArticle],
-    llm_config: LLMConfig,
-) -> list[LintIssue]:
-    """Run LLM lint pass on compiled wiki articles."""
-    if not articles:
-        return []
-
-    llm = LLMClient(llm_config)
-    console.print("[bold]Running lint pass on wiki articles...[/bold]")
-
-    prompt = _format_wiki_for_review(articles)
-    raw = llm.complete_json(SYSTEM_PROMPT, prompt, max_tokens=4096)
-
-    issues = []
-    for item in raw:
-        issues.append(
-            LintIssue(
-                article=item.get("article", "general"),
-                severity=item.get("severity", "info"),
-                message=item.get("message", ""),
-                suggestion=item.get("suggestion"),
-            )
-        )
-
-    errors = sum(1 for i in issues if i.severity == "error")
-    warnings = sum(1 for i in issues if i.severity == "warning")
-    infos = sum(1 for i in issues if i.severity == "info")
-
-    if issues:
-        console.print(f"[yellow]Lint: {errors} errors, {warnings} warnings, {infos} info[/yellow]")
-        for issue in issues:
-            icon = {"error": "❌", "warning": "⚠️", "info": "ℹ️"}.get(issue.severity, "•")
-            console.print(f"  {icon} [{issue.article}] {issue.message}")
-            if issue.suggestion:
-                console.print(f"    → {issue.suggestion}")
+def _print_report(report: LintReport) -> None:
+    if report.passed:
+        console.print("  [green]✓ Lint passed[/green]")
     else:
-        console.print("[green]Lint passed — no issues found.[/green]")
+        console.print("  [red]✗ Lint found issues:[/red]")
+    for issue in report.issues:
+        icon = {"info": "ℹ", "warning": "⚠", "error": "✗"}[issue.severity.value]
+        color = {"info": "blue", "warning": "yellow", "error": "red"}[issue.severity.value]
+        console.print(f"    [{color}]{icon} {issue.article}: {issue.message}[/{color}]")
+        if issue.suggestion:
+            console.print(f"      → {issue.suggestion}")
 
-    return issues
+
+def _load_lint(path: Path) -> LintReport:
+    with open(path) as f:
+        return LintReport.model_validate_json(f.read())

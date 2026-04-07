@@ -1,4 +1,4 @@
-"""Extract stage — LLM pass over each cluster to produce structured style observations."""
+"""Stage 3: Extract — LLM pass per cluster → structured style observations."""
 
 from __future__ import annotations
 
@@ -6,184 +6,134 @@ import json
 from pathlib import Path
 
 from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from gitstyle.config import LLMConfig
+from gitstyle.config import GitStyleConfig
 from gitstyle.llm_client import LLMClient
-from gitstyle.models import CommitCluster, StyleExtractionResult, StyleObservation
+from gitstyle.models import ClusterExtraction, Observation, SampledCluster, StyleDimension
 
 console = Console()
 
-STYLE_CATEGORIES = [
-    "code-structure",
-    "naming-conventions",
-    "patterns",
-    "type-discipline",
-    "testing",
-    "comments-and-docs",
-    "dependencies",
-    "commit-hygiene",
-    "language-idioms",
-]
+EXTRACT_SYSTEM = """\
+You are a senior code reviewer analyzing a developer's commit history to identify \
+their engineering style and patterns. You will receive a set of commits from a single \
+repository and programming language.
 
-EXTRACT_SYSTEM_INDIVIDUAL = """You are an expert code analyst. You examine Git commits and extract observations about a developer's engineering style.
+Analyze the commits and produce observations across these 9 style dimensions:
+1. code-structure — file organization, module boundaries, function/class sizing
+2. naming-conventions — variable, function, class, file naming patterns
+3. patterns — design patterns, architectural patterns, common abstractions
+4. type-discipline — type annotations, generics, type safety approach
+5. testing — test coverage, test style, testing frameworks, TDD signals
+6. comments-and-docs — documentation style, comment density, docstrings
+7. dependencies — dependency management, third-party library choices
+8. commit-hygiene — commit message style, commit size, branching patterns
+9. language-idioms — language-specific patterns, idiomatic usage
 
-Given a cluster of commits from one repo/language, analyze them and produce structured observations.
+For each observation provide:
+- dimension: one of the 9 dimensions above
+- claim: a specific, concrete observation about the developer's style
+- evidence: list of commit SHAs that support this claim
+- confidence: 0.0–1.0 (how confident given the evidence)
+- language: the programming language (if language-specific)
 
-For each observation, provide:
-- category: one of {categories}
-- observation: a clear, specific description of the pattern you see
-- evidence: list of commit SHAs that support this observation
-- confidence: low, medium, or high
-
-Output ONLY a JSON array of observation objects. No markdown, no explanation. Example:
-[
-  {{
-    "category": "naming-conventions",
-    "observation": "Uses snake_case for Python functions and variables, PascalCase for classes",
-    "evidence": ["abc1234", "def5678"],
-    "confidence": "high"
-  }}
-]"""
-
-EXTRACT_SYSTEM_ORG = """You are an expert code analyst. You examine Git commits and extract observations about an organization's engineering patterns and conventions.
-
-Given a cluster of commits from one repo/language within this organization, analyze them and produce structured observations about the org's shared engineering style.
-
-For each observation, provide:
-- category: one of {categories}
-- observation: a clear, specific description of the pattern you see across the org
-- evidence: list of commit SHAs that support this observation
-- confidence: low, medium, or high
-
-Output ONLY a JSON array of observation objects. No markdown, no explanation. Example:
-[
-  {{
-    "category": "naming-conventions",
-    "observation": "The org uses snake_case for Python functions and PascalCase for classes across all repos",
-    "evidence": ["abc1234", "def5678"],
-    "confidence": "high"
-  }}
-]"""
-
-EXTRACT_USER_INDIVIDUAL = """Cluster: {label}
-Repository: {repo}
-Language: {language}
-
-Commits ({count} total):
-{commits_text}
-
-Analyze these commits and extract observations about the developer's engineering style. Cover as many categories as the evidence supports: {categories}"""
-
-EXTRACT_USER_ORG = """Cluster: {label}
-Repository: {repo}
-Language: {language}
-
-Commits ({count} total):
-{commits_text}
-
-Analyze these commits and extract observations about this organization's engineering patterns and conventions. Cover as many categories as the evidence supports: {categories}"""
+Return valid JSON: {"observations": [...]}\
+"""
 
 
-def _format_commit(commit) -> str:
-    """Format a commit for the LLM prompt."""
-    lines = [f"### {commit.sha[:8]} — {commit.message.split(chr(10))[0]}"]
-    lines.append(f"Date: {commit.date}")
-    for f in commit.files[:20]:
-        lines.append(f"  {f.status} {f.filename} (+{f.additions}/-{f.deletions})")
-        if f.patch:
-            patch_lines = f.patch.split("\n")[:50]
-            lines.append("  ```")
-            lines.extend(f"  {pl}" for pl in patch_lines)
-            lines.append("  ```")
+def extract(
+    clusters: list[SampledCluster],
+    config: GitStyleConfig,
+) -> list[ClusterExtraction]:
+    """Run LLM extraction on each cluster."""
+    config.ensure_cache_dir()
+    cache = config.extractions_path()
+
+    if cache.exists():
+        console.print(f"[dim]Using cached extractions from {cache}[/dim]")
+        return _load_extractions(cache)
+
+    llm = LLMClient(model=config.llm_model)
+
+    # Cost estimate
+    total_tokens = 0
+    for cluster in clusters:
+        prompt = _build_prompt(cluster)
+        total_tokens += llm.estimate_tokens(prompt)
+    estimated_calls = len(clusters)
+    console.print(
+        f"[bold]Extract stage:[/bold] {estimated_calls} LLM calls, "
+        f"~{total_tokens:,} input tokens"
+    )
+    if config.dry_run:
+        console.print("[yellow]Dry run — skipping LLM calls[/yellow]")
+        return []
+
+    extractions: list[ClusterExtraction] = []
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Extracting...", total=len(clusters))
+        for cluster in clusters:
+            progress.update(
+                task, description=f"Extracting {cluster.repo} ({cluster.language})..."
+            )
+            prompt = _build_prompt(cluster)
+            try:
+                data = llm.complete_json(EXTRACT_SYSTEM, prompt)
+                observations = [
+                    Observation.model_validate(o) for o in data.get("observations", [])
+                ]
+            except Exception as e:
+                console.print(
+                    f"[red]  Error extracting {cluster.repo}/{cluster.language}: {e}[/red]"
+                )
+                observations = []
+
+            extractions.append(ClusterExtraction(
+                repo=cluster.repo,
+                language=cluster.language,
+                observations=observations,
+            ))
+            progress.advance(task)
+
+    # Cache
+    with open(cache, "w") as f:
+        json.dump([e.model_dump(mode="json") for e in extractions], f, indent=2)
+
+    total_obs = sum(len(e.observations) for e in extractions)
+    console.print(f"  Extracted [green]{total_obs}[/green] observations")
+    return extractions
+
+
+def _build_prompt(cluster: SampledCluster) -> str:
+    lines = [
+        f"Repository: {cluster.repo}",
+        f"Language: {cluster.language}",
+        f"Commits ({len(cluster.commits)} of {cluster.total_in_group} total):",
+        "",
+    ]
+    for c in cluster.commits:
+        lines.append(f"--- Commit {c.sha[:8]} ---")
+        lines.append(f"Date: {c.authored_at.isoformat()}")
+        lines.append(f"Message: {c.message}")
+        lines.append(f"Stats: +{c.additions} -{c.deletions}")
+        if c.files:
+            lines.append("Files:")
+            for f in c.files[:20]:  # cap files per commit
+                patch_preview = ""
+                if f.patch:
+                    patch_preview = f.patch[:500]
+                lines.append(f"  {f.status} {f.filename} (+{f.additions} -{f.deletions})")
+                if patch_preview:
+                    lines.append(f"    {patch_preview}")
+        lines.append("")
     return "\n".join(lines)
 
 
-def _cluster_cache_key(cluster: CommitCluster) -> str:
-    """Generate a safe filename for caching a cluster extraction."""
-    return cluster.label.replace("/", "_").replace(":", "_")
-
-
-def extract_cluster(
-    cluster: CommitCluster,
-    llm: LLMClient,
-    cache_dir: Path | None = None,
-    context_type: str = "individual",
-) -> StyleExtractionResult:
-    """Run LLM extraction on a single cluster."""
-    # Check cache
-    if cache_dir:
-        cache_path = cache_dir / "extractions" / f"{_cluster_cache_key(cluster)}.json"
-        if cache_path.exists():
-            return StyleExtractionResult.model_validate_json(cache_path.read_text())
-
-    commits_text = "\n\n".join(_format_commit(c) for c in cluster.commits)
-    if len(commits_text) > 80_000:
-        commits_text = commits_text[:80_000] + "\n\n[... truncated]"
-
-    if context_type == "organization":
-        system_tpl = EXTRACT_SYSTEM_ORG
-        user_tpl = EXTRACT_USER_ORG
-    else:
-        system_tpl = EXTRACT_SYSTEM_INDIVIDUAL
-        user_tpl = EXTRACT_USER_INDIVIDUAL
-
-    system = system_tpl.format(categories=", ".join(STYLE_CATEGORIES))
-    user = user_tpl.format(
-        label=cluster.label,
-        repo=cluster.repo,
-        language=cluster.language or "mixed",
-        count=len(cluster.commits),
-        commits_text=commits_text,
-        categories=", ".join(STYLE_CATEGORIES),
-    )
-
-    try:
-        data = llm.complete_json(system, user)
-    except (json.JSONDecodeError, Exception):
-        console.print(f"[yellow]Warning: Could not parse extraction for {cluster.label}[/yellow]")
-        return StyleExtractionResult(cluster_label=cluster.label)
-
-    observations = [
-        StyleObservation(
-            cluster_label=cluster.label,
-            category=obs.get("category", "unknown"),
-            observation=obs.get("observation", ""),
-            evidence=obs.get("evidence", []),
-            confidence=obs.get("confidence", "medium"),
-        )
-        for obs in data
-        if isinstance(obs, dict)
-    ]
-
-    result = StyleExtractionResult(cluster_label=cluster.label, observations=observations)
-
-    # Write cache
-    if cache_dir:
-        cache_path = cache_dir / "extractions" / f"{_cluster_cache_key(cluster)}.json"
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        cache_path.write_text(result.model_dump_json(indent=2))
-
-    return result
-
-
-def run_extract(
-    clusters: list[CommitCluster],
-    llm_config: LLMConfig,
-    cache_dir: Path,
-    context_type: str = "individual",
-) -> list[StyleExtractionResult]:
-    """Run extraction across all clusters."""
-    llm = LLMClient(llm_config)
-    results: list[StyleExtractionResult] = []
-
-    for i, cluster in enumerate(clusters, 1):
-        if not cluster.commits:
-            continue
-        console.print(f"[bold]Extracting [{i}/{len(clusters)}]: {cluster.label} ({len(cluster.commits)} commits)...[/bold]")
-        result = extract_cluster(cluster, llm, cache_dir, context_type=context_type)
-        console.print(f"  [green]{len(result.observations)} observations[/green]")
-        results.append(result)
-
-    total = sum(len(r.observations) for r in results)
-    console.print(f"[bold green]Extraction complete: {total} observations from {len(results)} clusters.[/bold green]")
-    return results
+def _load_extractions(path: Path) -> list[ClusterExtraction]:
+    with open(path) as f:
+        data = json.load(f)
+    return [ClusterExtraction.model_validate(d) for d in data]

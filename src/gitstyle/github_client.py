@@ -1,24 +1,28 @@
-"""GitHub API client for fetching commit history."""
+"""GitHub REST API client for fetching commit data."""
 
 from __future__ import annotations
 
-import httpx
-from rich.progress import Progress, SpinnerColumn, TextColumn
+import time
+from typing import Optional
 
-from gitstyle.models import Commit, CommitFile, RepoInfo
+import httpx
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+
+from gitstyle.models import CommitFile, RawCommit
+
+console = Console()
+
+GITHUB_API = "https://api.github.com"
 
 
 class GitHubClient:
-    """Fetches repos and commits from the GitHub REST API."""
-
-    BASE = "https://api.github.com"
-
-    def __init__(self, token: str | None = None) -> None:
+    def __init__(self, token: Optional[str] = None):
         headers = {"Accept": "application/vnd.github+json"}
         if token:
             headers["Authorization"] = f"Bearer {token}"
         self._client = httpx.Client(
-            base_url=self.BASE,
+            base_url=GITHUB_API,
             headers=headers,
             timeout=30.0,
         )
@@ -26,202 +30,129 @@ class GitHubClient:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> GitHubClient:
+    def __enter__(self):
         return self
 
-    def __exit__(self, *exc) -> None:
+    def __exit__(self, *args):
         self.close()
 
-    def _paginate(self, url: str, params: dict | None = None) -> list[dict]:
-        """Fetch all pages from a paginated endpoint."""
-        params = dict(params or {})
-        params.setdefault("per_page", 100)
-        results: list[dict] = []
-        while url:
-            resp = self._client.get(url, params=params)
-            resp.raise_for_status()
-            results.extend(resp.json())
-            # Follow Link: <url>; rel="next"
-            link = resp.headers.get("Link", "")
-            url = ""
-            for part in link.split(","):
-                if 'rel="next"' in part:
-                    url = part.split(";")[0].strip(" <>")
-            params = {}  # params are baked into the next URL
-        return results
-
-    def get_account_type(self, name: str) -> str:
-        """Check if a GitHub name is a 'User' or 'Organization'."""
-        resp = self._client.get(f"/users/{name}")
+    def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        resp = self._client.request(method, url, **kwargs)
+        if resp.status_code == 403 and "rate limit" in resp.text.lower():
+            reset = int(resp.headers.get("X-RateLimit-Reset", time.time() + 60))
+            wait = max(reset - int(time.time()), 1)
+            console.print(f"[yellow]Rate limited. Waiting {wait}s...[/yellow]")
+            time.sleep(wait)
+            resp = self._client.request(method, url, **kwargs)
         resp.raise_for_status()
-        return resp.json().get("type", "User")
+        return resp
 
-    def get_user_repos(
-        self,
-        username: str,
-        include_forks: bool = False,
-    ) -> list[RepoInfo]:
-        """List repos owned by a user."""
-        raw = self._paginate(f"/users/{username}/repos", {"sort": "pushed"})
-        repos = []
-        for r in raw:
-            if not include_forks and r.get("fork"):
-                continue
-            repos.append(
-                RepoInfo(
-                    name=r["name"],
-                    full_name=r["full_name"],
-                    description=r.get("description"),
-                    language=r.get("language"),
-                    is_fork=r.get("fork", False),
-                    stars=r.get("stargazers_count", 0),
-                    url=r.get("html_url", ""),
-                )
+    def list_repos(self, username: str, repos_filter: Optional[list[str]] = None) -> list[str]:
+        """List public repos for a user. Returns list of 'owner/name' strings."""
+        repos: list[str] = []
+        page = 1
+        while True:
+            resp = self._request(
+                "GET",
+                f"/users/{username}/repos",
+                params={"per_page": 100, "page": page, "type": "owner", "sort": "updated"},
             )
+            data = resp.json()
+            if not data:
+                break
+            for r in data:
+                if r.get("fork"):
+                    continue
+                full_name = r["full_name"]
+                if repos_filter and full_name not in repos_filter:
+                    continue
+                repos.append(full_name)
+            page += 1
         return repos
 
-    def get_org_repos(
-        self,
-        org: str,
-        include_forks: bool = False,
-    ) -> list[RepoInfo]:
-        """List repos owned by an organization, sorted by stars descending."""
-        raw = self._paginate(f"/orgs/{org}/repos", {"sort": "stars", "direction": "desc"})
-        repos = []
-        for r in raw:
-            if not include_forks and r.get("fork"):
-                continue
-            repos.append(
-                RepoInfo(
-                    name=r["name"],
-                    full_name=r["full_name"],
-                    description=r.get("description"),
-                    language=r.get("language"),
-                    is_fork=r.get("fork", False),
-                    stars=r.get("stargazers_count", 0),
-                    url=r.get("html_url", ""),
-                )
-            )
-        return repos
+    def get_repo_languages(self, repo: str) -> list[str]:
+        """Get languages for a repo. Returns list of language names."""
+        resp = self._request("GET", f"/repos/{repo}/languages")
+        return list(resp.json().keys())
 
-    def get_repo_languages(self, full_name: str) -> dict[str, int]:
-        """Get language breakdown for a repo."""
-        resp = self._client.get(f"/repos/{full_name}/languages")
-        resp.raise_for_status()
-        return resp.json()
-
-    def get_commits(
+    def list_commits(
         self,
-        full_name: str,
+        repo: str,
         author: str,
-        max_commits: int = 200,
-        since: str | None = None,
-        until: str | None = None,
-    ) -> list[Commit]:
-        """Fetch commits authored by a user in a repo."""
-        params: dict = {"author": author}
+        since: Optional[str] = None,
+        until: Optional[str] = None,
+        max_commits: int = 500,
+    ) -> list[dict]:
+        """List commits by author in a repo. Returns raw API dicts."""
+        commits: list[dict] = []
+        page = 1
+        params: dict = {"author": author, "per_page": 100, "page": page}
         if since:
             params["since"] = since
         if until:
             params["until"] = until
+        while len(commits) < max_commits:
+            params["page"] = page
+            try:
+                resp = self._request("GET", f"/repos/{repo}/commits", params=params)
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 409:  # empty repo
+                    break
+                raise
+            data = resp.json()
+            if not data:
+                break
+            commits.extend(data)
+            if len(data) < 100:
+                break
+            page += 1
+        return commits[:max_commits]
 
-        raw = self._paginate(f"/repos/{full_name}/commits", params)
-        commits: list[Commit] = []
-        for item in raw[:max_commits]:
-            c = item.get("commit", {})
-            commits.append(
-                Commit(
-                    sha=item["sha"],
-                    repo=full_name,
-                    message=c.get("message", ""),
-                    date=c.get("author", {}).get("date", ""),
-                    url=item.get("html_url", ""),
-                )
-            )
-        return commits
+    def get_commit_detail(self, repo: str, sha: str) -> dict:
+        """Get full commit detail including files/patch."""
+        resp = self._request("GET", f"/repos/{repo}/commits/{sha}")
+        return resp.json()
 
-    def get_commit_detail(self, full_name: str, sha: str) -> Commit:
-        """Fetch full commit detail including file diffs."""
-        resp = self._client.get(f"/repos/{full_name}/commits/{sha}")
-        resp.raise_for_status()
-        data = resp.json()
-        c = data.get("commit", {})
-        stats = data.get("stats", {})
-        files = [
-            CommitFile(
-                filename=f["filename"],
-                status=f.get("status", ""),
-                additions=f.get("additions", 0),
-                deletions=f.get("deletions", 0),
-                patch=f.get("patch"),
-            )
-            for f in data.get("files", [])
-        ]
-        return Commit(
-            sha=data["sha"],
-            repo=full_name,
-            message=c.get("message", ""),
-            date=c.get("author", {}).get("date", ""),
-            files=files,
-            additions=stats.get("additions", 0),
-            deletions=stats.get("deletions", 0),
-            url=data.get("html_url", ""),
-        )
-
-    def fetch_all(
+    def fetch_commits_for_repo(
         self,
-        username: str,
-        include_forks: bool = False,
-        include_repos: list[str] | None = None,
-        exclude_repos: list[str] | None = None,
-        max_commits_per_repo: int = 200,
-        max_repos: int = 0,
-        since: str | None = None,
-        until: str | None = None,
-    ) -> tuple[list[RepoInfo], list[Commit], str]:
-        """Fetch all repos and commits for a user or org.
-
-        Returns (repos, commits, account_type) where account_type is 'User' or 'Organization'.
-        """
-        account_type = self.get_account_type(username)
-
-        if account_type == "Organization":
-            repos = self.get_org_repos(username, include_forks=include_forks)
-        else:
-            repos = self.get_user_repos(username, include_forks=include_forks)
-
-        if include_repos:
-            repos = [r for r in repos if r.name in include_repos]
-        if exclude_repos:
-            repos = [r for r in repos if r.name not in exclude_repos]
-
-        # Cap repos (sorted by stars for orgs, already sorted by pushed for users)
-        if max_repos > 0:
-            repos = repos[:max_repos]
-
-        all_commits: list[Commit] = []
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-        ) as progress:
-            task = progress.add_task("Fetching commits...", total=len(repos))
-            for repo in repos:
-                progress.update(task, description=f"Fetching {repo.full_name}...")
-                try:
-                    repo.languages = self.get_repo_languages(repo.full_name)
-                except httpx.HTTPStatusError:
-                    pass
-                try:
-                    commits = self.get_commits(
-                        repo.full_name,
-                        author=username,
-                        max_commits=max_commits_per_repo,
-                        since=since,
-                        until=until,
-                    )
-                    all_commits.extend(commits)
-                except httpx.HTTPStatusError:
-                    pass
-                progress.advance(task)
-
-        return repos, all_commits, account_type
+        repo: str,
+        author: str,
+        languages: list[str],
+        since: Optional[str] = None,
+        until: Optional[str] = None,
+        max_commits: int = 500,
+    ) -> list[RawCommit]:
+        """Fetch and parse all commits for a single repo."""
+        raw_commits = self.list_commits(repo, author, since, until, max_commits)
+        results: list[RawCommit] = []
+        for c in raw_commits:
+            commit_data = c.get("commit", {})
+            author_date = commit_data.get("author", {}).get("date", "")
+            sha = c["sha"]
+            # Get detail for files
+            try:
+                detail = self.get_commit_detail(repo, sha)
+            except httpx.HTTPStatusError:
+                detail = {}
+            files = []
+            for f in detail.get("files", []):
+                files.append(CommitFile(
+                    filename=f.get("filename", ""),
+                    status=f.get("status", "modified"),
+                    additions=f.get("additions", 0),
+                    deletions=f.get("deletions", 0),
+                    patch=f.get("patch"),
+                ))
+            stats = detail.get("stats", {})
+            results.append(RawCommit(
+                sha=sha,
+                repo=repo,
+                message=commit_data.get("message", ""),
+                author=author,
+                authored_at=author_date,
+                additions=stats.get("additions", 0),
+                deletions=stats.get("deletions", 0),
+                files=files,
+                languages=languages,
+            ))
+        return results

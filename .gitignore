@@ -1,21 +1,30 @@
+# Generated wiki output
+wiki/
+
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
 *.egg-info/
 dist/
 build/
 .eggs/
-*.egg
+
+# Virtual environments
 .venv/
 venv/
-.env
-.gitstyle/
-*.jsonl
+
+# Testing
 .pytest_cache/
-.mypy_cache/
-.ruff_cache/
-*.key
-*.pem
-*.p12
-.env.*
-wiki/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# gitstyle cache
+.gitstyle/

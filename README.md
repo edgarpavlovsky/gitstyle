@@ -1,20 +1,6 @@
 # gitstyle
 
-Generate a personal engineering style wiki from your GitHub commit history.
-
-**gitstyle** ingests a developer's or organization's GitHub commits and compiles them into a portable markdown wiki that any coding agent (Claude Code, Cursor, Aider, etc.) can load as context to write code in that style.
-
-Inspired by [Karpathy's post on LLM Knowledge Bases](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — the idea that an LLM works best when it has a structured, personal knowledge base to draw from.
-
-![gitstyle demo](demo/demo.gif)
-
-## Why
-
-Every developer and engineering org has a style: naming conventions, error handling patterns, testing philosophy, commit hygiene, preferred libraries. When you bring a coding agent into your workflow, it starts from zero. **gitstyle** fixes that by mining real commit history for patterns and packaging them as a wiki any agent can read.
-
-Works for individual developers and GitHub organizations — gitstyle auto-detects which and adjusts its analysis accordingly.
-
-The output is plain markdown — no tool lock-in, no proprietary format. Browse it with the built-in web viewer (`gitstyle serve`), Obsidian, any coding agent, or as standalone documentation of your engineering preferences.
+Analyze a developer's GitHub commit history and compile it into a personal **engineering style wiki** — plain markdown, agent-agnostic, Obsidian-compatible.
 
 ## Install
 
@@ -22,243 +8,121 @@ The output is plain markdown — no tool lock-in, no proprietary format. Browse 
 pip install gitstyle
 ```
 
-Or from source:
-
-```bash
-git clone https://github.com/edgarpavlovsky/gitstyle.git
-cd gitstyle
-pip install -e .
-```
-
-### Requirements
-
-- Python 3.10+
-- A GitHub token for API rate limits: `export GITHUB_TOKEN=ghp_...`
-- An Anthropic API key for LLM stages: `export ANTHROPIC_API_KEY=sk-ant-...`
-
 ## Quickstart
 
 ```bash
-# Generate a developer's engineering style wiki
-gitstyle run karpathy
-
-# Or generate an org's engineering patterns wiki
-gitstyle run anthropic --max-repos 30
-
-# Output lands in wiki/ by default
-ls wiki/
+export GITHUB_TOKEN=ghp_...
+gitstyle run <username>
 ```
 
-That's it. The tool runs a 5-stage pipeline:
+This runs the full pipeline:
+1. **Fetch** — pulls commit data from GitHub REST API
+2. **Sample** — selects representative commits per repo × language
+3. **Extract** — LLM analyzes commits for style patterns across 9 dimensions
+4. **Compile** — LLM merges observations into markdown wiki articles
+5. **Lint** — LLM checks for contradictions and weak evidence
 
-1. **Fetch** — Pull commits + diffs via GitHub API
-2. **Sample** — Cluster by repo/language, select representative commits
-3. **Extract** — LLM analyzes each cluster for style patterns
-4. **Compile** — LLM synthesizes observations into wiki articles
-5. **Lint** — LLM health check for contradictions and weak evidence
+Output lands in `wiki/` — open it in Obsidian or any markdown viewer.
 
-## Output Format
+## Options
 
-gitstyle produces a directory of markdown files with YAML frontmatter, designed to be Obsidian-compatible and agent-readable:
+```
+gitstyle run <username> [OPTIONS]
+
+  --output, -o PATH       Output directory (default: wiki)
+  --cache PATH            Cache directory (default: .gitstyle)
+  --max-commits, -n INT   Max commits to fetch (default: 2000)
+  --samples, -s INT       Samples per group (default: 20)
+  --repos, -r TEXT        Comma-separated repo filter (owner/name)
+  --since TEXT            Only commits after this date (ISO 8601)
+  --until TEXT            Only commits before this date (ISO 8601)
+  --model, -m TEXT        LLM model (default: claude-sonnet-4-20250514)
+  --dry-run               Show cost estimates without making LLM calls
+  --token, -t TEXT        GitHub token (or set GITHUB_TOKEN)
+```
+
+## Individual Stages
+
+Run stages independently — each reads from cache if prior stages have run:
+
+```bash
+gitstyle fetch-cmd <username>
+gitstyle sample-cmd <username>
+gitstyle extract-cmd <username>
+gitstyle compile-cmd <username>
+gitstyle lint-cmd <username>
+```
+
+Clean cached data:
+
+```bash
+gitstyle clean
+```
+
+## Wiki Output
 
 ```
 wiki/
-  index.md                    # Master index with links to all articles
-  code-structure.md           # File/folder organization, module boundaries
-  naming-conventions.md       # Variable, function, file naming patterns
-  patterns.md                 # Error handling, async, state management
-  type-discipline.md          # Typing style and strictness
-  testing.md                  # Test structure, coverage philosophy
-  comments-and-docs.md        # Documentation density and style
-  dependencies.md             # Preferred libraries and tools
-  commit-hygiene.md           # Commit message style, branching patterns
+  index.md                    # Overview with links to all articles
+  code-structure.md           # File organization, module boundaries
+  naming-conventions.md       # Variable, function, class naming
+  patterns.md                 # Design patterns, abstractions
+  type-discipline.md          # Type annotations, generics
+  testing.md                  # Test coverage, frameworks, style
+  comments-and-docs.md        # Documentation approach
+  dependencies.md             # Third-party library choices
+  commit-hygiene.md           # Commit messages, branching
   languages/
-    python.md                 # Python-specific idioms
-    typescript.md             # TypeScript-specific idioms
+    python.md                 # Language-specific idioms
+    typescript.md
     ...
   _meta/
-    sources.md                # Repos and commit counts analyzed
-    generation-config.md      # Pipeline configuration used
-    log.md                    # Generation log
+    sources.md                # Repositories analyzed
+    generation-config.md      # Config used for generation
+    log.md                    # Generation log and lint results
 ```
 
-### Article format
+Each article includes:
+- **YAML frontmatter** — title, category, confidence level, source repos, last updated
+- **`[[wikilinks]]`** — cross-references between articles (Obsidian-compatible)
+- **Commit SHA citations** — every claim links back to specific commits
 
-Each article has YAML frontmatter:
+## Cost Estimate
 
-```yaml
----
-title: "Naming Conventions"
-category: style
-confidence: high
-sources: [user/repo-a, user/repo-b]
-related: [code-structure, patterns]
-last_updated: 2026-04-07
----
-```
-
-Cross-references use `[[wikilinks]]` (Obsidian-compatible). Every claim cites specific commits by SHA.
-
-### Sampling strategy
-
-Not every commit goes through the LLM. gitstyle clusters commits by repo and language, then samples up to 20 per cluster using a **balanced** strategy:
-
-- ~1/3 most recent commits (captures current style)
-- ~1/3 largest diffs (captures substantive changes)
-- ~1/3 random (captures breadth)
-
-Configurable via `--strategy` (`balanced`, `recent`, `largest`) and `--max-samples`.
-
-## Web Viewer
-
-gitstyle includes a built-in web viewer with an interactive knowledge graph:
+Use `--dry-run` to see how many LLM calls will be made:
 
 ```bash
-# Launch the viewer (opens browser automatically)
-gitstyle serve
-
-# Serve a specific wiki directory
-gitstyle serve examples/karpathy
-
-# Custom port, no auto-open
-gitstyle serve wiki/ --port 3000 --no-open
+gitstyle run <username> --dry-run
 ```
 
-The viewer has two modes:
+Typical run: ~10–30 LLM calls depending on repo count and language diversity.
 
-- **Graph view** (default) — Interactive force-directed graph showing how articles connect. Nodes are color-coded by category (gold = index, blue = style, green = language, gray = meta). Click any node to read the article. Hover to highlight connections.
-- **Article view** — Clean rendered markdown with syntax highlighting, confidence badges, and clickable wikilinks.
+## Agent Integration
 
-Dark theme. Zero dependencies — uses your browser and CDN-loaded libraries. Works offline with graceful degradation.
-
-## How to Plug Into Your Coding Agent
-
-### Claude Code
-
-Add to your project's `CLAUDE.md`:
-
-```markdown
-## My Engineering Style
-
-Load and follow the engineering style wiki in the `wiki/` directory for all code in this project.
-Start with wiki/index.md for an overview, then reference individual articles for specific conventions.
-```
-
-Or pass the wiki as context directly:
-
-```bash
-# Add wiki directory to Claude Code context
-claude --context wiki/
-```
-
-### Cursor
-
-Add to `.cursorrules` in your project root:
-
-```
-When writing code for this project, follow the engineering style conventions
-documented in the wiki/ directory:
-
-- wiki/naming-conventions.md for naming patterns
-- wiki/patterns.md for error handling and architecture patterns
-- wiki/testing.md for test structure and conventions
-- wiki/code-structure.md for file organization
-
-Every article includes specific examples from real commits. Follow these patterns.
-```
-
-### Any Agent (generic pattern)
-
-Include the wiki contents in your agent's system prompt or context window:
+The wiki output is plain markdown — any AI agent can read it to understand a developer's style:
 
 ```python
+# Load a developer's style context
 from pathlib import Path
 
-# Load the full wiki as context
-wiki_dir = Path("wiki")
 style_context = ""
-for md_file in sorted(wiki_dir.rglob("*.md")):
-    style_context += f"\n\n--- {md_file.relative_to(wiki_dir)} ---\n"
-    style_context += md_file.read_text()
+for md in Path("wiki").glob("*.md"):
+    style_context += md.read_text() + "\n\n"
 
-# Feed to your agent's system prompt
-system_prompt = f"""You are writing code for a developer with specific engineering preferences.
-Their style guide:
-
-{style_context}
-
-Follow these conventions when writing or reviewing code."""
+# Pass to your agent's system prompt
+system = f"Follow this developer's coding style:\n\n{style_context}"
 ```
 
-## CLI Reference
-
-```bash
-# Full pipeline
-gitstyle run <username> [options]
-
-# Fetch only (useful for inspecting data before running full pipeline)
-gitstyle fetch <username>
-
-# Launch web viewer with interactive graph
-gitstyle serve [wiki_dir]
-
-# Show version
-gitstyle version
+```yaml
+# CLAUDE.md / .cursorrules / etc.
+# Reference the wiki directly:
+# See wiki/ for my engineering style preferences.
 ```
-
-### Options
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--output, -o` | `wiki/` | Output directory |
-| `--cache` | `.gitstyle/` | Cache directory |
-| `--model, -m` | `claude-sonnet-4-20250514` | LLM model |
-| `--forks` | `false` | Include forked repos |
-| `--max-commits` | `200` | Max commits per repo |
-| `--max-repos` | `30` | Max repos to analyze (sorted by stars for orgs) |
-| `--max-samples` | `20` | Max samples per cluster |
-| `--since` | — | Start date (ISO 8601) |
-| `--until` | — | End date (ISO 8601) |
-| `--include-repos` | — | Comma-separated repos to include |
-| `--exclude-repos` | — | Comma-separated repos to exclude |
-| `--strategy` | `balanced` | Sampling: balanced, recent, largest |
-| `--skip-lint` | `false` | Skip lint stage |
-| `--port, -p` | `8080` | Port for `serve` command |
-| `--no-open` | `false` | Don't auto-open browser (`serve`) |
-
-### Environment Variables
-
-- `GITHUB_TOKEN` — GitHub personal access token (recommended for rate limits, required for private repos)
-- `ANTHROPIC_API_KEY` — Anthropic API key for LLM stages
-
-## Caching
-
-gitstyle caches aggressively to avoid redundant API calls and LLM invocations:
-
-- `.gitstyle/repos.jsonl` — Fetched repo metadata
-- `.gitstyle/commits.jsonl` — Fetched commit summaries
-- `.gitstyle/diffs/<sha>.json` — Individual commit diffs
-- `.gitstyle/extractions/<cluster>.json` — LLM extraction results per cluster
-- `.gitstyle/articles/<slug>.json` — Compiled article data
-
-Delete `.gitstyle/` to start fresh, or delete individual cache files to re-run specific stages.
-
-## Examples
-
-See the `examples/` directory for complete wiki outputs:
-
-### Individual developers
-- [`examples/karpathy/`](examples/karpathy/) — Andrej Karpathy's Python + C style (nanoGPT, llm.c, micrograd)
-- [`examples/torvalds/`](examples/torvalds/) — Linus Torvalds' kernel C style
-
-### Organizations
-- [`examples/anthropic/`](examples/anthropic/) — Anthropic's SDK and developer tools patterns (anthropic-sdk-python, anthropic-cookbook, claude-code)
-- [`examples/openai/`](examples/openai/) — OpenAI's SDK + research code patterns (openai-python, tiktoken, whisper, CLIP)
 
 ## Development
 
 ```bash
-git clone https://github.com/edgarpavlovsky/gitstyle.git
+git clone https://github.com/yourusername/gitstyle
 cd gitstyle
 pip install -e ".[dev]"
 pytest
@@ -266,4 +130,4 @@ pytest
 
 ## License
 
-[MIT](LICENSE)
+MIT

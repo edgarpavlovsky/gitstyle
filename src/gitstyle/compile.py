@@ -1,253 +1,182 @@
-"""Compile stage — merge observations into wiki articles."""
+"""Stage 4: Compile — merge observations into markdown wiki articles."""
 
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from pathlib import Path
 
 from rich.console import Console
 
-from gitstyle.config import LLMConfig
+from gitstyle.config import GitStyleConfig
 from gitstyle.llm_client import LLMClient
-from gitstyle.models import StyleExtractionResult, StyleObservation, WikiArticle
+from gitstyle.models import (
+    ClusterExtraction,
+    Observation,
+    StyleDimension,
+    WikiArticle,
+)
 
 console = Console()
 
-STYLE_CATEGORIES = {
-    "code-structure": "Code Structure",
-    "naming-conventions": "Naming Conventions",
-    "patterns": "Patterns & Architecture",
-    "type-discipline": "Type Discipline",
-    "testing": "Testing",
-    "comments-and-docs": "Comments & Documentation",
-    "dependencies": "Dependencies",
-    "commit-hygiene": "Commit Hygiene",
-}
+COMPILE_SYSTEM = """\
+You are compiling a developer's engineering style wiki from extracted observations.
 
-SYSTEM_PROMPT_INDIVIDUAL = """\
-You are compiling a developer's engineering style wiki from structured observations \
-extracted from their GitHub commit history.
-
-You will receive a set of observations for a specific style category, collected across \
-multiple repositories and languages. Synthesize them into a clear, well-structured \
-wiki article.
+You will receive observations grouped by style dimension. Your job is to synthesize \
+them into a single, coherent wiki article for that dimension.
 
 Requirements:
-- Write in third person ("The developer prefers..." not "You prefer...")
-- Cite specific commits using [SHA] notation where applicable
-- Use markdown formatting with headers, bullet points, and code examples where helpful
-- Note confidence levels and flag any contradictions between observations
-- Use [[wikilinks]] to cross-reference other style dimension articles
-- Be specific and concrete, not generic
+- Write in third person ("The developer tends to...")
+- Use Obsidian-compatible `[[wikilinks]]` to cross-reference other dimensions
+- Cite specific commit SHAs inline as evidence (format: `[abc1234]`)
+- Include a confidence assessment
+- Be specific and concrete — avoid vague generalities
+- If observations conflict, note the contradiction and which has stronger evidence
 
-Return a JSON object with:
-- title: article title
-- content: full markdown content (without frontmatter — that's added separately)
-- confidence: overall confidence ("low", "medium", "high")
-- sources: array of repo names that contributed observations
-- related: array of other article slugs that are referenced"""
+Return valid JSON:
+{
+  "title": "...",
+  "content": "... markdown body ...",
+  "confidence": 0.0-1.0,
+  "wikilinks": ["other-dimension-slug", ...]
+}\
+"""
 
-SYSTEM_PROMPT_ORG = """\
-You are compiling an engineering style wiki for a GitHub organization from structured \
-observations extracted from their repositories' commit history.
+LANGUAGE_COMPILE_SYSTEM = """\
+You are compiling a language-specific engineering style article from observations.
 
-You will receive a set of observations for a specific style category, collected across \
-the organization's repositories. Synthesize them into a clear, well-structured wiki article \
-about this organization's engineering patterns and conventions.
+Write about the developer's idiomatic usage, patterns, and preferences specific to \
+this programming language. Cross-reference universal style dimensions with `[[wikilinks]]`.
 
-Requirements:
-- Write about the organization's patterns ("The org standardizes..." or "Across repos, the convention is...")
-- Cite specific commits using [SHA] notation where applicable
-- Use markdown formatting with headers, bullet points, and code examples where helpful
-- Note confidence levels and flag any contradictions between repos
-- Use [[wikilinks]] to cross-reference other style dimension articles
-- Be specific and concrete, not generic
+Cite commit SHAs inline. Be specific.
 
-Return a JSON object with:
-- title: article title
-- content: full markdown content (without frontmatter — that's added separately)
-- confidence: overall confidence ("low", "medium", "high")
-- sources: array of repo names that contributed observations
-- related: array of other article slugs that are referenced"""
-
-LANGUAGE_SYSTEM_PROMPT_INDIVIDUAL = """\
-You are compiling a language-specific style guide from a developer's GitHub commit history. \
-You will receive observations specific to a programming language.
-
-Write a focused wiki article covering this developer's idioms, patterns, and conventions \
-in this language. Reference specific commits and cross-link to the core style dimension articles.
-
-Return a JSON object with:
-- title: article title (e.g. "Python Style")
-- content: full markdown content
-- confidence: overall confidence
-- sources: array of repo names
-- related: array of related article slugs"""
-
-LANGUAGE_SYSTEM_PROMPT_ORG = """\
-You are compiling a language-specific style guide for a GitHub organization. \
-You will receive observations specific to a programming language across the org's repos.
-
-Write a focused wiki article covering this organization's shared idioms, patterns, and \
-conventions in this language. Reference specific commits and cross-link to the core style \
-dimension articles.
-
-Return a JSON object with:
-- title: article title (e.g. "Python Style")
-- content: full markdown content
-- confidence: overall confidence
-- sources: array of repo names
-- related: array of related article slugs"""
+Return valid JSON:
+{
+  "title": "...",
+  "content": "... markdown body ...",
+  "confidence": 0.0-1.0,
+  "wikilinks": ["other-slug", ...]
+}\
+"""
 
 
-def _group_observations(
-    extractions: list[StyleExtractionResult],
-) -> tuple[dict[str, list[StyleObservation]], dict[str, list[StyleObservation]]]:
-    """Group observations by category and by language."""
-    by_category: dict[str, list[StyleObservation]] = defaultdict(list)
-    by_language: dict[str, list[StyleObservation]] = defaultdict(list)
+def compile_wiki(
+    extractions: list[ClusterExtraction],
+    config: GitStyleConfig,
+) -> list[WikiArticle]:
+    """Compile extractions into wiki articles."""
+    config.ensure_cache_dir()
+    cache = config.articles_path()
 
-    for extraction in extractions:
-        # Detect language from cluster label
-        parts = extraction.cluster_label.rsplit(":", 1)
-        lang = parts[1] if len(parts) == 2 else None
+    if cache.exists():
+        console.print(f"[dim]Using cached articles from {cache}[/dim]")
+        return _load_articles(cache)
 
-        for obs in extraction.observations:
-            by_category[obs.category].append(obs)
-            if lang and lang != "unknown":
-                by_language[lang].append(obs)
+    llm = LLMClient(model=config.llm_model)
 
-    return by_category, by_language
+    # Group observations by dimension
+    by_dimension: dict[StyleDimension, list[Observation]] = defaultdict(list)
+    by_language: dict[str, list[Observation]] = defaultdict(list)
+    all_repos: set[str] = set()
+
+    for ext in extractions:
+        all_repos.add(ext.repo)
+        for obs in ext.observations:
+            by_dimension[obs.dimension].append(obs)
+            if obs.language and obs.dimension == StyleDimension.LANGUAGE_IDIOMS:
+                by_language[obs.language].append(obs)
+
+    # Estimate cost
+    total_calls = len(by_dimension) + len(by_language)
+    console.print(f"[bold]Compile stage:[/bold] {total_calls} LLM calls")
+    if config.dry_run:
+        console.print("[yellow]Dry run — skipping LLM calls[/yellow]")
+        return []
+
+    articles: list[WikiArticle] = []
+    repos_list = sorted(all_repos)
+
+    # Compile dimension articles
+    for dim in StyleDimension:
+        obs_list = by_dimension.get(dim, [])
+        if not obs_list:
+            continue
+        console.print(f"  Compiling [cyan]{dim.value}[/cyan]...")
+        prompt = _build_dimension_prompt(dim, obs_list)
+        try:
+            data = llm.complete_json(COMPILE_SYSTEM, prompt)
+            articles.append(WikiArticle(
+                slug=dim.value,
+                title=data.get("title", dim.value.replace("-", " ").title()),
+                category="dimension",
+                confidence=data.get("confidence", 0.5),
+                source_repos=repos_list,
+                content=data.get("content", ""),
+                wikilinks=data.get("wikilinks", []),
+            ))
+        except Exception as e:
+            console.print(f"[red]  Error compiling {dim.value}: {e}[/red]")
+
+    # Compile language articles
+    for lang, obs_list in sorted(by_language.items()):
+        if not obs_list:
+            continue
+        slug = lang.lower().replace(" ", "-").replace("#", "sharp").replace("+", "plus")
+        console.print(f"  Compiling language: [cyan]{lang}[/cyan]...")
+        prompt = _build_language_prompt(lang, obs_list)
+        try:
+            data = llm.complete_json(LANGUAGE_COMPILE_SYSTEM, prompt)
+            articles.append(WikiArticle(
+                slug=slug,
+                title=data.get("title", f"{lang} Style"),
+                category="language",
+                confidence=data.get("confidence", 0.5),
+                source_repos=repos_list,
+                content=data.get("content", ""),
+                wikilinks=data.get("wikilinks", []),
+            ))
+        except Exception as e:
+            console.print(f"[red]  Error compiling {lang}: {e}[/red]")
+
+    # Cache
+    with open(cache, "w") as f:
+        json.dump([a.model_dump(mode="json") for a in articles], f, indent=2)
+
+    console.print(f"  Compiled [green]{len(articles)}[/green] articles")
+    return articles
 
 
-def _format_observations_prompt(category: str, observations: list[StyleObservation]) -> str:
+def _build_dimension_prompt(dim: StyleDimension, observations: list[Observation]) -> str:
     lines = [
-        f"Category: {category}",
+        f"Dimension: {dim.value}",
         f"Total observations: {len(observations)}",
         "",
+        "Observations:",
     ]
-    for obs in observations:
-        lines.append(f"- [{obs.confidence}] {obs.observation}")
-        if obs.evidence:
-            lines.append(f"  Evidence: {', '.join(obs.evidence[:5])}")
-        lines.append(f"  Source cluster: {obs.cluster_label}")
-        lines.append("")
+    for i, obs in enumerate(observations, 1):
+        lines.append(f"\n{i}. [{obs.confidence:.0%} confidence]")
+        lines.append(f"   Claim: {obs.claim}")
+        lines.append(f"   Evidence: {', '.join(obs.evidence)}")
+        if obs.language:
+            lines.append(f"   Language: {obs.language}")
     return "\n".join(lines)
 
 
-def compile_category_article(
-    slug: str,
-    category_name: str,
-    observations: list[StyleObservation],
-    llm: LLMClient,
-    cache_dir: Path | None = None,
-    context_type: str = "individual",
-) -> WikiArticle:
-    """Compile observations for one category into a wiki article."""
-    if cache_dir:
-        cache_path = cache_dir / "articles" / f"{slug}.json"
-        if cache_path.exists():
-            return WikiArticle.model_validate_json(cache_path.read_text())
-
-    prompt = _format_observations_prompt(category_name, observations)
-    system = SYSTEM_PROMPT_ORG if context_type == "organization" else SYSTEM_PROMPT_INDIVIDUAL
-    raw = llm.complete_json(system, prompt, max_tokens=4096)
-
-    sources = list({obs.cluster_label.rsplit(":", 1)[0] for obs in observations})
-
-    article = WikiArticle(
-        slug=slug,
-        title=raw.get("title", category_name),
-        category="style",
-        content=raw.get("content", ""),
-        sources=raw.get("sources", sources),
-        confidence=raw.get("confidence", "medium"),
-        related=raw.get("related", []),
-    )
-
-    if cache_dir:
-        cache_path = cache_dir / "articles" / f"{slug}.json"
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        cache_path.write_text(article.model_dump_json(indent=2))
-
-    return article
+def _build_language_prompt(language: str, observations: list[Observation]) -> str:
+    lines = [
+        f"Language: {language}",
+        f"Total observations: {len(observations)}",
+        "",
+        "Observations:",
+    ]
+    for i, obs in enumerate(observations, 1):
+        lines.append(f"\n{i}. [{obs.confidence:.0%} confidence] ({obs.dimension.value})")
+        lines.append(f"   Claim: {obs.claim}")
+        lines.append(f"   Evidence: {', '.join(obs.evidence)}")
+    return "\n".join(lines)
 
 
-def compile_language_article(
-    language: str,
-    observations: list[StyleObservation],
-    llm: LLMClient,
-    cache_dir: Path | None = None,
-    context_type: str = "individual",
-) -> WikiArticle:
-    """Compile language-specific observations into a wiki article."""
-    slug = language.lower().replace(" ", "-")
-
-    if cache_dir:
-        cache_path = cache_dir / "articles" / f"lang-{slug}.json"
-        if cache_path.exists():
-            return WikiArticle.model_validate_json(cache_path.read_text())
-
-    prompt = _format_observations_prompt(language, observations)
-    lang_system = LANGUAGE_SYSTEM_PROMPT_ORG if context_type == "organization" else LANGUAGE_SYSTEM_PROMPT_INDIVIDUAL
-    raw = llm.complete_json(lang_system, prompt, max_tokens=4096)
-
-    sources = list({obs.cluster_label.rsplit(":", 1)[0] for obs in observations})
-
-    article = WikiArticle(
-        slug=slug,
-        title=raw.get("title", f"{language.title()} Style"),
-        category="language",
-        content=raw.get("content", ""),
-        sources=raw.get("sources", sources),
-        confidence=raw.get("confidence", "medium"),
-        related=raw.get("related", []),
-    )
-
-    if cache_dir:
-        cache_path = cache_dir / "articles" / f"lang-{slug}.json"
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        cache_path.write_text(article.model_dump_json(indent=2))
-
-    return article
-
-
-def run_compile(
-    extractions: list[StyleExtractionResult],
-    llm_config: LLMConfig,
-    cache_dir: Path | None = None,
-    context_type: str = "individual",
-) -> list[WikiArticle]:
-    """Compile all observations into wiki articles."""
-    llm = LLMClient(llm_config)
-    by_category, by_language = _group_observations(extractions)
-    articles: list[WikiArticle] = []
-
-    console.print("[bold]Compiling wiki articles...[/bold]")
-
-    # Core style dimension articles
-    for slug, display_name in STYLE_CATEGORIES.items():
-        observations = by_category.get(slug, [])
-        if not observations:
-            continue
-        console.print(f"  Writing {slug}...")
-        article = compile_category_article(slug, display_name, observations, llm, cache_dir, context_type=context_type)
-        articles.append(article)
-
-    # Language-idioms get folded into language-specific articles
-    idiom_obs = by_category.get("language-idioms", [])
-    for obs in idiom_obs:
-        parts = obs.cluster_label.rsplit(":", 1)
-        if len(parts) == 2 and parts[1] != "unknown":
-            by_language[parts[1]].append(obs)
-
-    # Language-specific articles
-    for lang, observations in by_language.items():
-        if len(observations) < 2:  # Skip languages with very few observations
-            continue
-        console.print(f"  Writing languages/{lang}...")
-        article = compile_language_article(lang, observations, llm, cache_dir, context_type=context_type)
-        articles.append(article)
-
-    console.print(f"[green]Compiled {len(articles)} wiki articles.[/green]")
-    return articles
+def _load_articles(path: Path) -> list[WikiArticle]:
+    with open(path) as f:
+        data = json.load(f)
+    return [WikiArticle.model_validate(d) for d in data]

@@ -1,50 +1,40 @@
-"""Configuration models for gitstyle."""
+"""Configuration for gitstyle."""
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
 
-class FetchConfig(BaseModel):
-    """Configuration for the fetch stage."""
-
+class GitStyleConfig(BaseModel):
     username: str
-    token: str | None = Field(default_factory=lambda: os.environ.get("GITHUB_TOKEN"))
-    include_repos: list[str] | None = None
-    exclude_repos: list[str] | None = None
-    include_forks: bool = False
-    include_contributions: bool = False
-    max_commits_per_repo: int = 200
-    max_repos: int = 30
-    since: str | None = None
-    until: str | None = None
-
-
-class SampleConfig(BaseModel):
-    """Configuration for the sampling stage."""
-
-    max_samples_per_cluster: int = 20
-    min_diff_lines: int = 5
-    strategy: str = "balanced"  # balanced | recent | largest
-
-
-class LLMConfig(BaseModel):
-    """Configuration for LLM stages."""
-
-    model: str = "claude-sonnet-4-20250514"
-    max_tokens: int = 4096
-    api_key: str | None = Field(default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY"))
-
-
-class PipelineConfig(BaseModel):
-    """Top-level configuration."""
-
-    fetch: FetchConfig
-    sample: SampleConfig = SampleConfig()
-    llm: LLMConfig = LLMConfig()
+    github_token: Optional[str] = None
     output_dir: Path = Path("wiki")
     cache_dir: Path = Path(".gitstyle")
-    context_type: str = "individual"  # "individual" or "organization"
+    max_commits: int = 2000
+    samples_per_group: int = 20
+    repos: Optional[list[str]] = None  # None = all public repos
+    since: Optional[str] = None  # ISO date string
+    until: Optional[str] = None
+    llm_model: str = "claude-sonnet-4-20250514"
+    dry_run: bool = False
+
+    def commits_path(self) -> Path:
+        return self.cache_dir / "commits.jsonl"
+
+    def samples_path(self) -> Path:
+        return self.cache_dir / "samples.json"
+
+    def extractions_path(self) -> Path:
+        return self.cache_dir / "extractions.json"
+
+    def articles_path(self) -> Path:
+        return self.cache_dir / "articles.json"
+
+    def lint_path(self) -> Path:
+        return self.cache_dir / "lint.json"
+
+    def ensure_cache_dir(self) -> None:
+        self.cache_dir.mkdir(parents=True, exist_ok=True)

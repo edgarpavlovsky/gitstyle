@@ -1,140 +1,94 @@
-"""Sample stage — cluster commits and select representative samples."""
+"""Stage 2: Sample — group commits by repo × language, sample representative commits."""
 
 from __future__ import annotations
 
+import json
 import random
 from collections import defaultdict
+from pathlib import Path
 
 from rich.console import Console
 
-from gitstyle.config import SampleConfig
-from gitstyle.models import Commit, CommitCluster, RepoInfo
+from gitstyle.config import GitStyleConfig
+from gitstyle.models import RawCommit, SampledCluster
 
 console = Console()
 
-# Map file extensions to languages
-EXT_LANG: dict[str, str] = {
-    ".py": "python", ".pyi": "python",
-    ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript",
-    ".ts": "typescript", ".tsx": "typescript",
-    ".go": "go",
-    ".rs": "rust",
-    ".java": "java",
-    ".rb": "ruby",
-    ".swift": "swift",
-    ".kt": "kotlin",
-    ".c": "c", ".h": "c",
-    ".cpp": "cpp", ".hpp": "cpp", ".cc": "cpp",
-    ".cs": "csharp",
-    ".php": "php",
-    ".sh": "shell", ".bash": "shell", ".zsh": "shell",
-    ".sql": "sql",
-    ".html": "html", ".css": "css", ".scss": "scss",
-    ".yaml": "yaml", ".yml": "yaml",
-    ".json": "json",
-    ".md": "markdown",
-    ".toml": "toml",
-    ".dockerfile": "docker",
-}
 
+def sample(commits: list[RawCommit], config: GitStyleConfig) -> list[SampledCluster]:
+    """Group commits by repo × language and sample representative ones."""
+    config.ensure_cache_dir()
+    cache = config.samples_path()
 
-def _detect_language(commit: Commit) -> str | None:
-    """Detect primary language from changed files."""
-    lang_counts: dict[str, int] = defaultdict(int)
-    for f in commit.files:
-        ext = "." + f.filename.rsplit(".", 1)[-1] if "." in f.filename else ""
-        lang = EXT_LANG.get(ext.lower())
-        if lang:
-            lang_counts[lang] += f.additions + f.deletions
-    if not lang_counts:
-        return None
-    return max(lang_counts, key=lambda k: lang_counts[k])
+    if cache.exists():
+        console.print(f"[dim]Using cached samples from {cache}[/dim]")
+        return _load_samples(cache)
 
+    console.print("[bold]Sampling representative commits...[/bold]")
 
-def _diff_size(commit: Commit) -> int:
-    return commit.additions + commit.deletions
+    # Group by repo × language
+    groups: dict[tuple[str, str], list[RawCommit]] = defaultdict(list)
+    for c in commits:
+        if c.languages:
+            for lang in c.languages:
+                groups[(c.repo, lang)].append(c)
+        else:
+            groups[(c.repo, "unknown")].append(c)
 
+    clusters: list[SampledCluster] = []
+    for (repo, lang), group_commits in groups.items():
+        total = len(group_commits)
+        sampled = _sample_group(group_commits, config.samples_per_group)
+        clusters.append(SampledCluster(
+            repo=repo,
+            language=lang,
+            commits=sampled,
+            total_in_group=total,
+        ))
 
-def cluster_commits(
-    commits: list[Commit],
-    repos: list[RepoInfo],
-) -> list[CommitCluster]:
-    """Group commits by repo × primary language."""
-    buckets: dict[str, list[Commit]] = defaultdict(list)
-    for commit in commits:
-        lang = _detect_language(commit) or "unknown"
-        key = f"{commit.repo}:{lang}"
-        buckets[key].append(commit)
+    # Cache
+    with open(cache, "w") as f:
+        json.dump([c.model_dump(mode="json") for c in clusters], f, indent=2, default=str)
 
-    clusters = []
-    for key, group in buckets.items():
-        repo_name, lang = key.rsplit(":", 1)
-        clusters.append(
-            CommitCluster(
-                label=key,
-                repo=repo_name,
-                language=lang if lang != "unknown" else None,
-                commits=group,
-            )
-        )
+    total_sampled = sum(len(c.commits) for c in clusters)
+    console.print(
+        f"  [green]{len(clusters)}[/green] clusters, "
+        f"[green]{total_sampled}[/green] sampled commits"
+    )
     return clusters
 
 
-def sample_cluster(cluster: CommitCluster, config: SampleConfig) -> CommitCluster:
-    """Select representative commits from a cluster using the configured strategy."""
-    commits = cluster.commits
-    n = config.max_samples_per_cluster
-
+def _sample_group(commits: list[RawCommit], n: int) -> list[RawCommit]:
+    """Sample up to n commits: most recent + largest diffs + random fill."""
     if len(commits) <= n:
-        return cluster
+        return commits
 
-    # Filter out trivially small diffs
-    nontrivial = [c for c in commits if _diff_size(c) >= config.min_diff_lines]
-    if not nontrivial:
-        nontrivial = commits
+    selected: dict[str, RawCommit] = {}
 
-    if config.strategy == "recent":
-        sampled = sorted(nontrivial, key=lambda c: c.date, reverse=True)[:n]
-    elif config.strategy == "largest":
-        sampled = sorted(nontrivial, key=_diff_size, reverse=True)[:n]
-    else:
-        # balanced: mix of recent, largest, and random
-        by_date = sorted(nontrivial, key=lambda c: c.date, reverse=True)
-        by_size = sorted(nontrivial, key=_diff_size, reverse=True)
-        third = max(1, n // 3)
-        selected = set()
-        sampled = []
-        for source in [by_date, by_size]:
-            for c in source:
-                if c.sha not in selected and len(sampled) < third * (1 + len(sampled) // third):
-                    selected.add(c.sha)
-                    sampled.append(c)
-                if len(sampled) >= third * 2:
-                    break
-        remaining = [c for c in nontrivial if c.sha not in selected]
-        if remaining:
-            extras = random.sample(remaining, min(n - len(sampled), len(remaining)))
-            sampled.extend(extras)
+    # Most recent (top 1/3)
+    by_date = sorted(commits, key=lambda c: c.authored_at, reverse=True)
+    recent_n = n // 3
+    for c in by_date[:recent_n]:
+        selected[c.sha] = c
 
-    return CommitCluster(
-        label=cluster.label,
-        repo=cluster.repo,
-        language=cluster.language,
-        commits=sampled[:n],
-    )
+    # Largest diffs (top 1/3)
+    by_size = sorted(commits, key=lambda c: c.additions + c.deletions, reverse=True)
+    large_n = n // 3
+    for c in by_size[:large_n]:
+        selected[c.sha] = c
+
+    # Random fill
+    remaining = [c for c in commits if c.sha not in selected]
+    fill_n = n - len(selected)
+    if fill_n > 0 and remaining:
+        random.seed(42)  # reproducible
+        for c in random.sample(remaining, min(fill_n, len(remaining))):
+            selected[c.sha] = c
+
+    return list(selected.values())
 
 
-def run_sample(
-    commits: list[Commit],
-    repos: list[RepoInfo],
-    config: SampleConfig,
-) -> list[CommitCluster]:
-    """Cluster and sample commits. Returns sampled clusters."""
-    clusters = cluster_commits(commits, repos)
-    console.print(f"[bold]Formed {len(clusters)} clusters from {len(commits)} commits.[/bold]")
-
-    sampled = [sample_cluster(c, config) for c in clusters]
-    total = sum(len(c.commits) for c in sampled)
-    console.print(f"[green]Sampled down to {total} representative commits.[/green]")
-
-    return sampled
+def _load_samples(path: Path) -> list[SampledCluster]:
+    with open(path) as f:
+        data = json.load(f)
+    return [SampledCluster.model_validate(d) for d in data]

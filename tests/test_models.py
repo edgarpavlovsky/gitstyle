@@ -1,98 +1,114 @@
-"""Tests for data models."""
+"""Tests for pydantic models."""
+
+from datetime import datetime, timezone
 
 from gitstyle.models import (
-    Commit,
-    CommitCluster,
+    ClusterExtraction,
     CommitFile,
     LintIssue,
-    RepoInfo,
-    StyleExtractionResult,
-    StyleObservation,
+    LintReport,
+    LintSeverity,
+    Observation,
+    RawCommit,
+    SampledCluster,
+    StyleDimension,
     WikiArticle,
 )
 
 
-def test_repo_info_defaults():
-    repo = RepoInfo(name="test", full_name="user/test")
-    assert repo.language is None
-    assert repo.is_fork is False
-    assert repo.languages == {}
-
-
-def test_commit_file():
-    f = CommitFile(filename="main.py", status="modified", additions=10, deletions=3)
-    assert f.filename == "main.py"
-    assert f.patch is None
-
-
-def test_commit_with_files():
-    commit = Commit(
-        sha="abc123",
+def test_raw_commit_roundtrip():
+    c = RawCommit(
+        sha="abc1234",
         repo="user/repo",
-        message="fix bug",
-        date="2024-01-01T00:00:00Z",
-        files=[CommitFile(filename="a.py", additions=5, deletions=2)],
-        additions=5,
-        deletions=2,
+        message="fix: handle edge case",
+        author="testuser",
+        authored_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        additions=10,
+        deletions=3,
+        files=[
+            CommitFile(filename="src/main.py", status="modified", additions=10, deletions=3)
+        ],
+        languages=["Python"],
     )
-    assert len(commit.files) == 1
-    assert commit.additions == 5
+    json_str = c.model_dump_json()
+    restored = RawCommit.model_validate_json(json_str)
+    assert restored.sha == "abc1234"
+    assert restored.repo == "user/repo"
+    assert len(restored.files) == 1
+    assert restored.files[0].filename == "src/main.py"
 
 
-def test_commit_cluster():
-    commits = [
-        Commit(sha="a", repo="user/repo", message="one", date="2024-01-01"),
-        Commit(sha="b", repo="user/repo", message="two", date="2024-01-02"),
-    ]
-    cluster = CommitCluster(
-        label="user/repo:python",
-        repo="user/repo",
-        language="python",
-        commits=commits,
+def test_observation_confidence_bounds():
+    obs = Observation(
+        dimension=StyleDimension.NAMING,
+        claim="Uses snake_case for functions",
+        evidence=["abc1234", "def5678"],
+        confidence=0.9,
+        language="Python",
     )
-    assert len(cluster.commits) == 2
-    assert cluster.language == "python"
+    assert obs.confidence == 0.9
+    assert obs.dimension == StyleDimension.NAMING
 
 
-def test_style_observation():
-    obs = StyleObservation(
-        cluster_label="user/repo:python",
-        category="naming-conventions",
-        observation="Uses snake_case",
-        evidence=["abc123"],
-        confidence="high",
+def test_sampled_cluster():
+    commit = RawCommit(
+        sha="abc",
+        repo="u/r",
+        message="test",
+        author="u",
+        authored_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
     )
-    assert obs.category == "naming-conventions"
-
-
-def test_style_extraction_result():
-    result = StyleExtractionResult(cluster_label="user/repo:python")
-    assert result.observations == []
+    cluster = SampledCluster(
+        repo="u/r",
+        language="Python",
+        commits=[commit],
+        total_in_group=50,
+    )
+    assert cluster.total_in_group == 50
+    assert len(cluster.commits) == 1
 
 
 def test_wiki_article():
     article = WikiArticle(
         slug="naming-conventions",
         title="Naming Conventions",
-        category="style",
-        content="# Naming\nUses snake_case.",
-        sources=["user/repo"],
+        category="dimension",
+        confidence=0.85,
+        source_repos=["user/repo1", "user/repo2"],
+        content="# Naming\n\nThe developer uses snake_case...",
+        wikilinks=["code-structure", "patterns"],
     )
-    assert article.confidence == "medium"
-    assert article.related == []
+    assert article.slug == "naming-conventions"
+    assert len(article.wikilinks) == 2
 
 
-def test_lint_issue():
-    issue = LintIssue(
-        article="naming-conventions",
-        severity="warning",
-        message="Weak evidence",
+def test_lint_report():
+    report = LintReport(
+        issues=[
+            LintIssue(
+                article="naming-conventions",
+                severity=LintSeverity.WARNING,
+                message="Weak evidence for claim about camelCase",
+                suggestion="Add more commit references",
+            )
+        ],
+        passed=False,
     )
-    assert issue.suggestion is None
+    assert not report.passed
+    assert len(report.issues) == 1
+    assert report.issues[0].severity == LintSeverity.WARNING
 
 
-def test_model_serialization():
-    commit = Commit(sha="abc", repo="u/r", message="test", date="2024-01-01")
-    json_str = commit.model_dump_json()
-    restored = Commit.model_validate_json(json_str)
-    assert restored.sha == "abc"
+def test_cluster_extraction():
+    ext = ClusterExtraction(
+        repo="u/r",
+        language="Python",
+        observations=[
+            Observation(
+                dimension=StyleDimension.CODE_STRUCTURE,
+                claim="Small, focused functions",
+                evidence=["abc"],
+            )
+        ],
+    )
+    assert len(ext.observations) == 1

@@ -4,17 +4,16 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gitstyle"
-version = "0.1.0"
-description = "Generate a personal engineering style wiki from your GitHub commit history"
+version = "0.3.0"
+description = "Analyze a developer's GitHub commit history and compile it into a personal engineering style wiki."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-authors = [
-    { name = "Edgar Pavlovsky" },
-]
-keywords = ["github", "coding-style", "wiki", "llm", "developer-tools"]
+authors = [{ name = "Edgar Pavlovsky" }]
+keywords = ["github", "engineering", "style", "wiki", "cli"]
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -34,8 +33,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "pytest-asyncio>=0.23.0",
-    "pytest-mock>=3.12.0",
+    "pytest-asyncio>=0.21.0",
     "respx>=0.21.0",
 ]
 
@@ -47,4 +45,4 @@ packages = ["src/gitstyle"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-asyncio_mode = "auto"
+pythonpath = ["src"]

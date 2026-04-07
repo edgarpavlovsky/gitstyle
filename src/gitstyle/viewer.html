@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gitstyle — Engineering Style Wiki</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;
+  --fg:#e6edf3;--fg2:#8b949e;--fg3:#484f58;
+  --accent:#58a6ff;--accent2:#3fb950;
+  --gold:#d29922;--blue:#58a6ff;--green:#3fb950;--gray:#8b949e;
+  --border:#30363d;--radius:6px;
+}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);overflow:hidden}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Layout */
+#app{display:flex;height:100vh}
+#sidebar{width:260px;min-width:260px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+#sidebar-header{padding:16px;border-bottom:1px solid var(--border)}
+#sidebar-header h1{font-size:14px;font-weight:600;color:var(--fg)}
+#sidebar-header .subtitle{font-size:11px;color:var(--fg2);margin-top:2px}
+#sidebar-nav{flex:1;overflow-y:auto;padding:8px 0}
+.nav-section{padding:8px 16px 4px;font-size:11px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:.5px}
+.nav-item{display:block;padding:6px 16px 6px 24px;font-size:13px;color:var(--fg2);cursor:pointer;border-left:2px solid transparent;transition:all .15s}
+.nav-item:hover{color:var(--fg);background:var(--bg3)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(56,139,253,.1)}
+#sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--fg3)}
+
+/* Main area */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#toolbar{height:44px;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid var(--border);background:var(--bg2);gap:8px}
+.tab{padding:6px 14px;font-size:13px;color:var(--fg2);cursor:pointer;border-radius:var(--radius);transition:all .15s}
+.tab:hover{color:var(--fg);background:var(--bg3)}
+.tab.active{color:var(--fg);background:var(--bg3);font-weight:600}
+#breadcrumb{margin-left:auto;font-size:12px;color:var(--fg3)}
+
+#content{flex:1;overflow:hidden;position:relative}
+#graph-view,#article-view{position:absolute;inset:0;overflow:hidden}
+#article-view{overflow-y:auto;padding:32px 48px;display:none}
+#graph-view svg{width:100%;height:100%}
+
+/* Article markdown styles */
+.article-meta{margin-bottom:24px;padding:16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)}
+.article-meta h1{font-size:24px;margin-bottom:8px}
+.badge{display:inline-block;padding:2px 8px;font-size:11px;border-radius:12px;font-weight:600;margin-right:6px}
+.badge-high{background:rgba(63,185,80,.15);color:var(--green)}
+.badge-medium{background:rgba(210,153,34,.15);color:var(--gold)}
+.badge-low{background:rgba(248,81,73,.15);color:#f85149}
+.badge-category{background:rgba(88,166,255,.15);color:var(--accent)}
+.meta-row{font-size:12px;color:var(--fg2);margin-top:6px}
+
+/* Markdown rendered content */
+.md-body{line-height:1.7;font-size:15px}
+.md-body h1{font-size:22px;margin:28px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.md-body h2{font-size:18px;margin:24px 0 10px}
+.md-body h3{font-size:15px;margin:20px 0 8px}
+.md-body p{margin:12px 0}
+.md-body ul,.md-body ol{margin:12px 0;padding-left:24px}
+.md-body li{margin:4px 0}
+.md-body code{background:var(--bg3);padding:2px 6px;border-radius:3px;font-size:13px}
+.md-body pre{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;overflow-x:auto;margin:16px 0}
+.md-body pre code{background:none;padding:0}
+.md-body blockquote{border-left:3px solid var(--border);padding-left:16px;color:var(--fg2);margin:12px 0}
+.md-body table{border-collapse:collapse;margin:12px 0;width:100%}
+.md-body th,.md-body td{padding:8px 12px;border:1px solid var(--border);text-align:left}
+.md-body th{background:var(--bg2);font-weight:600}
+.md-body a{color:var(--accent)}
+
+/* Graph tooltip */
+.graph-tooltip{position:absolute;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:100}
+
+/* CDN error */
+#cdn-error{display:none;position:absolute;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;flex-direction:column;padding:48px;text-align:center}
+#cdn-error h2{color:var(--gold);margin-bottom:12px}
+#cdn-error p{color:var(--fg2);max-width:480px;line-height:1.6}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--fg3);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--fg2)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h1>gitstyle</h1>
+      <div class="subtitle">Engineering Style Wiki</div>
+    </div>
+    <div id="sidebar-nav"></div>
+    <div id="sidebar-footer">Powered by gitstyle</div>
+  </div>
+  <div id="main">
+    <div id="toolbar">
+      <div class="tab active" data-view="graph">Graph</div>
+      <div class="tab" data-view="article">Reader</div>
+      <div id="breadcrumb"></div>
+    </div>
+    <div id="content">
+      <div id="graph-view"></div>
+      <div id="article-view"></div>
+      <div class="graph-tooltip" id="tooltip"></div>
+    </div>
+  </div>
+</div>
+
+<div id="cdn-error">
+  <h2>CDN Unreachable</h2>
+  <p>This viewer requires external libraries (D3.js, marked.js, highlight.js) loaded from CDN. Please check your internet connection and reload.</p>
+</div>
+
+<script>
+// CDN dependency loader
+const DEPS = [
+  { url: 'https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js', global: 'd3' },
+  { url: 'https://cdn.jsdelivr.net/npm/marked/marked.min.js', global: 'marked' },
+  { url: 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js', global: 'hljs' },
+];
+const HLJS_CSS = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css';
+
+let cdnReady = false;
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+function loadCSS(href) {
+  const l = document.createElement('link');
+  l.rel = 'stylesheet';
+  l.href = href;
+  document.head.appendChild(l);
+}
+
+async function loadDeps() {
+  try {
+    loadCSS(HLJS_CSS);
+    for (const dep of DEPS) {
+      await loadScript(dep.url);
+      if (!window[dep.global]) throw new Error(`${dep.global} not loaded`);
+    }
+    cdnReady = true;
+  } catch (e) {
+    document.getElementById('cdn-error').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    return false;
+  }
+  return true;
+}
+
+// State
+let files = [];
+let graphData = null;
+let currentView = 'graph';
+let currentFile = null;
+let simulation = null;
+
+// API
+async function apiFetch(path) {
+  const r = await fetch(path);
+  return r.json();
+}
+
+// Sidebar
+function renderSidebar() {
+  const nav = document.getElementById('sidebar-nav');
+  const groups = { index: [], dimension: [], language: [], meta: [] };
+  files.forEach(f => {
+    const cat = f.meta.category || 'meta';
+    (groups[cat] || groups.meta).push(f);
+  });
+
+  let html = '';
+  const sections = [
+    ['index', 'Index'],
+    ['dimension', 'Style Dimensions'],
+    ['language', 'Languages'],
+    ['meta', 'Meta'],
+  ];
+  sections.forEach(([key, label]) => {
+    if (!groups[key] || groups[key].length === 0) return;
+    html += `<div class="nav-section">${label}</div>`;
+    groups[key].forEach(f => {
+      const title = f.meta.title || f.slug;
+      const active = currentFile === f.path ? ' active' : '';
+      html += `<div class="nav-item${active}" data-path="${f.path}">${title}</div>`;
+    });
+  });
+  nav.innerHTML = html;
+
+  nav.querySelectorAll('.nav-item').forEach(el => {
+    el.addEventListener('click', () => {
+      navigateTo(el.dataset.path);
+    });
+  });
+}
+
+// Navigation
+async function navigateTo(path) {
+  currentFile = path;
+  currentView = 'article';
+  updateTabs();
+  renderSidebar();
+  await renderArticle(path);
+}
+
+function showGraph() {
+  currentView = 'graph';
+  currentFile = null;
+  updateTabs();
+  renderSidebar();
+  document.getElementById('graph-view').style.display = '';
+  document.getElementById('article-view').style.display = 'none';
+  document.getElementById('breadcrumb').textContent = '';
+}
+
+function updateTabs() {
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.view === currentView);
+  });
+  if (currentView === 'graph') {
+    document.getElementById('graph-view').style.display = '';
+    document.getElementById('article-view').style.display = 'none';
+  } else {
+    document.getElementById('graph-view').style.display = 'none';
+    document.getElementById('article-view').style.display = '';
+  }
+}
+
+// Article renderer
+async function renderArticle(path) {
+  const data = await apiFetch(`/api/file/${path}`);
+  const meta = data.meta || {};
+  const body = data.body || '';
+
+  let confidence = meta.confidence;
+  let badgeClass = 'badge-medium';
+  if (confidence >= 0.8) badgeClass = 'badge-high';
+  else if (confidence < 0.5) badgeClass = 'badge-low';
+
+  let metaHtml = `<div class="article-meta">`;
+  metaHtml += `<h1>${meta.title || path}</h1>`;
+  if (meta.category) metaHtml += `<span class="badge badge-category">${meta.category}</span>`;
+  if (confidence !== undefined) metaHtml += `<span class="badge ${badgeClass}">${(confidence * 100).toFixed(0)}% confidence</span>`;
+  if (meta.source_repos && meta.source_repos.length > 0) {
+    metaHtml += `<div class="meta-row">Sources: ${meta.source_repos.join(', ')}</div>`;
+  }
+  if (meta.last_updated) {
+    metaHtml += `<div class="meta-row">Updated: ${meta.last_updated}</div>`;
+  }
+  metaHtml += `</div>`;
+
+  // Render markdown
+  const rendered = marked.parse(body, {
+    gfm: true,
+    breaks: false,
+    highlight: (code, lang) => {
+      if (lang && hljs.getLanguage(lang)) {
+        return hljs.highlight(code, { language: lang }).value;
+      }
+      return hljs.highlightAuto(code).value;
+    },
+  });
+
+  // Replace wikilinks with clickable links
+  const withLinks = rendered.replace(/\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g, (m, target, label) => {
+    const display = label || target;
+    return `<a href="#" class="wikilink" data-target="${target}">${display}</a>`;
+  });
+
+  const el = document.getElementById('article-view');
+  el.innerHTML = metaHtml + `<div class="md-body">${withLinks}</div>`;
+  el.scrollTop = 0;
+
+  // Highlight code blocks
+  el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+
+  // Wire wikilinks
+  el.querySelectorAll('.wikilink').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const target = a.dataset.target;
+      // Find matching file
+      const match = files.find(f =>
+        f.slug === target ||
+        f.path === target + '.md' ||
+        f.path === target
+      );
+      if (match) navigateTo(match.path);
+    });
+  });
+
+  document.getElementById('breadcrumb').textContent = meta.title || path;
+}
+
+// Graph
+const CATEGORY_COLORS = {
+  index: '#d29922',
+  dimension: '#58a6ff',
+  language: '#3fb950',
+  meta: '#8b949e',
+};
+
+function renderGraph() {
+  if (!graphData || !cdnReady) return;
+
+  const container = document.getElementById('graph-view');
+  container.innerHTML = '';
+  const tooltip = document.getElementById('tooltip');
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+
+  const svg = d3.select(container)
+    .append('svg')
+    .attr('width', width)
+    .attr('height', height);
+
+  // Zoom layer
+  const g = svg.append('g');
+  svg.call(d3.zoom()
+    .scaleExtent([0.2, 4])
+    .on('zoom', (event) => g.attr('transform', event.transform))
+  );
+
+  // Scale node size by link count
+  const maxLinks = Math.max(1, d3.max(graphData.nodes, d => d.links) || 1);
+  const rScale = d3.scaleSqrt().domain([0, maxLinks]).range([6, 22]);
+
+  // Build simulation
+  const linkData = graphData.edges.map(e => ({
+    source: e.source,
+    target: e.target,
+  }));
+
+  simulation = d3.forceSimulation(graphData.nodes)
+    .force('link', d3.forceLink(linkData).id(d => d.id).distance(80))
+    .force('charge', d3.forceManyBody().strength(-200))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('collision', d3.forceCollide().radius(d => rScale(d.links) + 4));
+
+  // Links
+  const link = g.append('g')
+    .selectAll('line')
+    .data(linkData)
+    .join('line')
+    .attr('stroke', '#30363d')
+    .attr('stroke-width', 1)
+    .attr('stroke-opacity', 0.6);
+
+  // Nodes
+  const node = g.append('g')
+    .selectAll('circle')
+    .data(graphData.nodes)
+    .join('circle')
+    .attr('r', d => rScale(d.links))
+    .attr('fill', d => CATEGORY_COLORS[d.category] || CATEGORY_COLORS.meta)
+    .attr('stroke', '#0d1117')
+    .attr('stroke-width', 1.5)
+    .attr('cursor', 'pointer');
+
+  // Labels
+  const label = g.append('g')
+    .selectAll('text')
+    .data(graphData.nodes)
+    .join('text')
+    .text(d => d.title)
+    .attr('font-size', 11)
+    .attr('fill', '#e6edf3')
+    .attr('text-anchor', 'middle')
+    .attr('dy', d => rScale(d.links) + 14)
+    .attr('pointer-events', 'none');
+
+  // Drag
+  node.call(d3.drag()
+    .on('start', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    })
+    .on('drag', (event, d) => {
+      d.fx = event.x;
+      d.fy = event.y;
+    })
+    .on('end', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    })
+  );
+
+  // Hover highlight
+  node.on('mouseover', (event, d) => {
+    const connected = new Set();
+    linkData.forEach(l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      if (sid === d.id) connected.add(tid);
+      if (tid === d.id) connected.add(sid);
+    });
+    connected.add(d.id);
+
+    node.attr('opacity', n => connected.has(n.id) ? 1 : 0.15);
+    link.attr('stroke-opacity', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return connected.has(sid) && connected.has(tid) ? 0.8 : 0.05;
+    });
+    label.attr('opacity', n => connected.has(n.id) ? 1 : 0.1);
+
+    tooltip.style.opacity = 1;
+    tooltip.innerHTML = `<strong>${d.title}</strong><br>${d.category} &middot; ${d.links} connections`;
+    tooltip.style.left = (event.pageX + 12) + 'px';
+    tooltip.style.top = (event.pageY - 12) + 'px';
+  })
+  .on('mousemove', (event) => {
+    tooltip.style.left = (event.pageX + 12) + 'px';
+    tooltip.style.top = (event.pageY - 12) + 'px';
+  })
+  .on('mouseout', () => {
+    node.attr('opacity', 1);
+    link.attr('stroke-opacity', 0.6);
+    label.attr('opacity', 1);
+    tooltip.style.opacity = 0;
+  });
+
+  // Click to navigate
+  node.on('click', (event, d) => {
+    navigateTo(d.id);
+  });
+
+  // Tick
+  simulation.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+    node
+      .attr('cx', d => d.x)
+      .attr('cy', d => d.y);
+    label
+      .attr('x', d => d.x)
+      .attr('y', d => d.y);
+  });
+}
+
+// Tab clicks
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    if (t.dataset.view === 'graph') {
+      showGraph();
+    } else if (currentFile) {
+      currentView = 'article';
+      updateTabs();
+    }
+  });
+});
+
+// Resize
+window.addEventListener('resize', () => {
+  if (currentView === 'graph') renderGraph();
+});
+
+// Init
+async function init() {
+  const ok = await loadDeps();
+  if (!ok) return;
+
+  [files, graphData] = await Promise.all([
+    apiFetch('/api/files'),
+    apiFetch('/api/graph'),
+  ]);
+
+  renderSidebar();
+  renderGraph();
+}
+
+init();
+</script>
+</body>
+</html>

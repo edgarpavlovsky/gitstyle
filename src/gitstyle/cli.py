@@ -1,212 +1,275 @@
-"""CLI interface for gitstyle."""
+"""gitstyle CLI — powered by Typer."""
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 
 from gitstyle import __version__
-from gitstyle.config import FetchConfig, LLMConfig, PipelineConfig, SampleConfig
+from gitstyle.config import GitStyleConfig
 
 app = typer.Typer(
     name="gitstyle",
-    help="Generate a personal engineering style wiki from your GitHub commit history.",
+    help="Analyze a developer's GitHub commit history → engineering style wiki.",
     no_args_is_help=True,
 )
 console = Console()
 
 
-def _build_config(
-    username: str,
-    output_dir: Path = Path("wiki"),
-    cache_dir: Path = Path(".gitstyle"),
-    model: str = "claude-sonnet-4-20250514",
-    include_forks: bool = False,
-    max_commits: int = 200,
-    max_repos: int = 30,
-    max_samples: int = 20,
-    since: Optional[str] = None,
-    until: Optional[str] = None,
-    include_repos: Optional[list[str]] = None,
-    exclude_repos: Optional[list[str]] = None,
-    strategy: str = "balanced",
-) -> PipelineConfig:
-    return PipelineConfig(
-        fetch=FetchConfig(
-            username=username,
-            include_forks=include_forks,
-            include_repos=include_repos,
-            exclude_repos=exclude_repos,
-            max_commits_per_repo=max_commits,
-            max_repos=max_repos,
-            since=since,
-            until=until,
-        ),
-        sample=SampleConfig(max_samples_per_cluster=max_samples, strategy=strategy),
-        llm=LLMConfig(model=model),
-        output_dir=output_dir,
-        cache_dir=cache_dir,
-    )
+def _version_callback(value: bool):
+    if value:
+        console.print(f"gitstyle {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: Optional[bool] = typer.Option(
+        None, "--version", "-v", callback=_version_callback, is_eager=True,
+        help="Show version and exit.",
+    ),
+):
+    pass
 
 
 @app.command()
 def run(
-    username: str = typer.Argument(help="GitHub username or organization to analyze"),
-    output_dir: Path = typer.Option(Path("wiki"), "--output", "-o", help="Output directory for wiki"),
-    cache_dir: Path = typer.Option(Path(".gitstyle"), "--cache", help="Cache directory"),
-    model: str = typer.Option("claude-sonnet-4-20250514", "--model", "-m", help="LLM model to use"),
-    include_forks: bool = typer.Option(False, "--forks", help="Include forked repos"),
-    max_commits: int = typer.Option(200, "--max-commits", help="Max commits per repo"),
-    max_repos: int = typer.Option(30, "--max-repos", help="Max repos to analyze (sorted by stars for orgs)"),
-    max_samples: int = typer.Option(20, "--max-samples", help="Max samples per cluster"),
-    since: Optional[str] = typer.Option(None, "--since", help="Fetch commits after this date (ISO format)"),
-    until: Optional[str] = typer.Option(None, "--until", help="Fetch commits before this date (ISO format)"),
-    skip_lint: bool = typer.Option(False, "--skip-lint", help="Skip the lint stage"),
-    include_repos: Optional[str] = typer.Option(None, "--include-repos", help="Comma-separated repos to include"),
-    exclude_repos: Optional[str] = typer.Option(None, "--exclude-repos", help="Comma-separated repos to exclude"),
-    strategy: str = typer.Option("balanced", "--strategy", help="Sampling: balanced, recent, largest"),
-) -> None:
-    """Run the full pipeline: fetch → sample → extract → compile → lint."""
-    from gitstyle.compile import run_compile
-    from gitstyle.extract import run_extract
-    from gitstyle.fetch import fetch_diffs, run_fetch
-    from gitstyle.lint import run_lint
-    from gitstyle.sample import run_sample
-    from gitstyle.wiki_writer import write_article, write_index, write_meta
-
-    config = _build_config(
-        username=username,
-        output_dir=output_dir,
-        cache_dir=cache_dir,
-        model=model,
-        include_forks=include_forks,
-        max_commits=max_commits,
-        max_repos=max_repos,
-        max_samples=max_samples,
-        since=since,
-        until=until,
-        include_repos=include_repos.split(",") if include_repos else None,
-        exclude_repos=exclude_repos.split(",") if exclude_repos else None,
-        strategy=strategy,
-    )
-
-    console.print(f"\n[bold cyan]gitstyle v{__version__}[/bold cyan]")
-    console.print(f"Analyzing [bold]{username}[/bold]...\n")
-
-    # Stage 1: Fetch (auto-detects user vs org)
-    console.rule("[bold]Stage 1: Fetch[/bold]")
-    repos, commits, account_type = run_fetch(config.fetch, config.cache_dir)
-    context_type = "organization" if account_type == "Organization" else "individual"
-    config.context_type = context_type
-
-    if context_type == "organization":
-        console.print(f"[bold cyan]Detected organization — analyzing org engineering patterns[/bold cyan]")
-    else:
-        console.print(f"Analyzing [bold]{username}[/bold]'s engineering style...")
-
-    if not commits:
-        console.print("[red]No commits found. Check the username and try again.[/red]")
+    username: str = typer.Argument(..., help="GitHub username to analyze."),
+    output: Path = typer.Option(Path("wiki"), "--output", "-o", help="Output directory for wiki."),
+    cache_dir: Path = typer.Option(Path(".gitstyle"), "--cache", help="Cache directory."),
+    max_commits: int = typer.Option(2000, "--max-commits", "-n", help="Max commits to fetch."),
+    samples: int = typer.Option(20, "--samples", "-s", help="Samples per repo×language group."),
+    repos: Optional[str] = typer.Option(None, "--repos", "-r", help="Comma-separated repo filter (owner/name)."),
+    since: Optional[str] = typer.Option(None, "--since", help="Only commits after this date (ISO 8601)."),
+    until: Optional[str] = typer.Option(None, "--until", help="Only commits before this date (ISO 8601)."),
+    model: str = typer.Option("claude-sonnet-4-20250514", "--model", "-m", help="LLM model to use."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would happen without making LLM calls."),
+    token: Optional[str] = typer.Option(None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)."),
+):
+    """Run the full pipeline: fetch → sample → extract → compile → lint → write."""
+    github_token = token or os.environ.get("GITHUB_TOKEN")
+    if not github_token:
+        console.print("[red]Error: Set GITHUB_TOKEN env var or pass --token[/red]")
         raise typer.Exit(1)
 
-    # Stage 2: Sample
-    console.rule("[bold]Stage 2: Sample[/bold]")
-    # Fetch diffs for all commits before sampling
-    enriched = fetch_diffs(commits, config.fetch, config.cache_dir)
-    clusters = run_sample(enriched, repos, config.sample)
+    repos_list = [r.strip() for r in repos.split(",")] if repos else None
 
-    # Stage 3: Extract
-    console.rule("[bold]Stage 3: Extract[/bold]")
-    extractions = run_extract(clusters, config.llm, config.cache_dir, context_type=context_type)
-
-    # Stage 4: Compile
-    console.rule("[bold]Stage 4: Compile[/bold]")
-    articles = run_compile(extractions, config.llm, config.cache_dir, context_type=context_type)
-
-    # Stage 5: Lint
-    if not skip_lint:
-        console.rule("[bold]Stage 5: Lint[/bold]")
-        run_lint(articles, config.llm)
-
-    # Write output
-    console.rule("[bold]Writing Wiki[/bold]")
-    for article in articles:
-        filepath = write_article(article, config.output_dir)
-        console.print(f"  Wrote {filepath}")
-
-    write_index(articles, config.output_dir)
-
-    stats = {
-        "total_fetched": len(commits),
-        "total_sampled": sum(len(c.commits) for c in clusters),
-        "repos": {r.full_name: len([c for c in commits if c.repo == r.full_name]) for r in repos},
-    }
-    log_entries = [
-        f"Generated by gitstyle v{__version__}",
-        f"User: {username}",
-        f"Model: {config.llm.model}",
-        f"Repos analyzed: {len(repos)}",
-        f"Total commits: {len(commits)}",
-        f"Clusters formed: {len(clusters)}",
-        f"Articles written: {len(articles)}",
-    ]
-    write_meta(
-        config.model_dump(mode="json", exclude={"fetch": {"token"}, "llm": {"api_key"}}),
-        stats,
-        log_entries,
-        config.output_dir,
+    config = GitStyleConfig(
+        username=username,
+        github_token=github_token,
+        output_dir=output,
+        cache_dir=cache_dir,
+        max_commits=max_commits,
+        samples_per_group=samples,
+        repos=repos_list,
+        since=since,
+        until=until,
+        llm_model=model,
+        dry_run=dry_run,
     )
 
-    console.print(f"\n[bold green]✓ Wiki generated at {config.output_dir}/[/bold green]")
-    console.print(f"  {len(articles)} articles across {len(repos)} repos")
+    console.print(Panel(
+        f"[bold]gitstyle[/bold] v{__version__}\n"
+        f"Analyzing [cyan]{username}[/cyan]'s engineering style",
+        border_style="blue",
+    ))
+
+    _run_pipeline(config)
 
 
 @app.command()
-def fetch(
-    username: str = typer.Argument(help="GitHub username"),
+def fetch_cmd(
+    username: str = typer.Argument(..., help="GitHub username."),
     cache_dir: Path = typer.Option(Path(".gitstyle"), "--cache"),
-    include_forks: bool = typer.Option(False, "--forks"),
-    max_commits: int = typer.Option(200, "--max-commits"),
+    max_commits: int = typer.Option(2000, "--max-commits", "-n"),
+    repos: Optional[str] = typer.Option(None, "--repos", "-r"),
     since: Optional[str] = typer.Option(None, "--since"),
     until: Optional[str] = typer.Option(None, "--until"),
-) -> None:
+    token: Optional[str] = typer.Option(None, "--token", "-t"),
+):
     """Run only the fetch stage."""
-    from gitstyle.fetch import run_fetch
+    from gitstyle.fetch import fetch
 
-    config = FetchConfig(
-        username=username,
-        include_forks=include_forks,
-        max_commits_per_repo=max_commits,
-        since=since,
-        until=until,
+    github_token = token or os.environ.get("GITHUB_TOKEN")
+    repos_list = [r.strip() for r in repos.split(",")] if repos else None
+    config = GitStyleConfig(
+        username=username, github_token=github_token, cache_dir=cache_dir,
+        max_commits=max_commits, repos=repos_list, since=since, until=until,
     )
-    repos, commits, _account_type = run_fetch(config, cache_dir)
-    console.print(f"[green]Fetched {len(commits)} commits from {len(repos)} repos.[/green]")
+    fetch(config)
+
+
+@app.command()
+def sample_cmd(
+    username: str = typer.Argument(..., help="GitHub username."),
+    cache_dir: Path = typer.Option(Path(".gitstyle"), "--cache"),
+    samples: int = typer.Option(20, "--samples", "-s"),
+):
+    """Run only the sample stage (requires cached commits)."""
+    from gitstyle.fetch import fetch
+    from gitstyle.sample import sample
+
+    config = GitStyleConfig(username=username, cache_dir=cache_dir, samples_per_group=samples)
+    commits = fetch(config)
+    sample(commits, config)
+
+
+@app.command()
+def extract_cmd(
+    username: str = typer.Argument(..., help="GitHub username."),
+    cache_dir: Path = typer.Option(Path(".gitstyle"), "--cache"),
+    model: str = typer.Option("claude-sonnet-4-20250514", "--model", "-m"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+):
+    """Run only the extract stage (requires cached samples)."""
+    from gitstyle.extract import extract
+    from gitstyle.fetch import fetch
+    from gitstyle.sample import sample
+
+    config = GitStyleConfig(
+        username=username, cache_dir=cache_dir, llm_model=model, dry_run=dry_run,
+    )
+    commits = fetch(config)
+    clusters = sample(commits, config)
+    extract(clusters, config)
+
+
+@app.command()
+def compile_cmd(
+    username: str = typer.Argument(..., help="GitHub username."),
+    cache_dir: Path = typer.Option(Path(".gitstyle"), "--cache"),
+    output: Path = typer.Option(Path("wiki"), "--output", "-o"),
+    model: str = typer.Option("claude-sonnet-4-20250514", "--model", "-m"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+):
+    """Run only the compile stage (requires cached extractions)."""
+    from gitstyle.compile import compile_wiki
+    from gitstyle.extract import extract
+    from gitstyle.fetch import fetch
+    from gitstyle.sample import sample
+
+    config = GitStyleConfig(
+        username=username, cache_dir=cache_dir, output_dir=output,
+        llm_model=model, dry_run=dry_run,
+    )
+    commits = fetch(config)
+    clusters = sample(commits, config)
+    extractions = extract(clusters, config)
+    compile_wiki(extractions, config)
+
+
+@app.command()
+def lint_cmd(
+    username: str = typer.Argument(..., help="GitHub username."),
+    cache_dir: Path = typer.Option(Path(".gitstyle"), "--cache"),
+    model: str = typer.Option("claude-sonnet-4-20250514", "--model", "-m"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+):
+    """Run only the lint stage (requires cached articles)."""
+    from gitstyle.compile import compile_wiki
+    from gitstyle.extract import extract
+    from gitstyle.fetch import fetch
+    from gitstyle.lint import lint
+    from gitstyle.sample import sample
+
+    config = GitStyleConfig(
+        username=username, cache_dir=cache_dir, llm_model=model, dry_run=dry_run,
+    )
+    commits = fetch(config)
+    clusters = sample(commits, config)
+    extractions = extract(clusters, config)
+    articles = compile_wiki(extractions, config)
+    lint(articles, config)
 
 
 @app.command()
 def serve(
-    wiki_dir: Path = typer.Argument(Path("wiki"), help="Path to a gitstyle wiki directory"),
-    port: int = typer.Option(8080, "--port", "-p", help="Port to serve on"),
-    no_open: bool = typer.Option(False, "--no-open", help="Don't open browser automatically"),
-) -> None:
-    """Launch a local web viewer for a gitstyle wiki."""
-    from gitstyle.serve import run_server
+    wiki_dir: Path = typer.Option(Path("wiki"), "--wiki-dir", "-w", help="Wiki directory to serve."),
+    port: int = typer.Option(8080, "--port", "-p", help="Port to listen on."),
+    no_open: bool = typer.Option(False, "--no-open", help="Don't auto-open browser."),
+):
+    """Launch local web viewer with interactive graph visualization."""
+    if not wiki_dir.exists():
+        console.print(f"[red]Error: Wiki directory '{wiki_dir}' not found.[/red]")
+        console.print("[dim]Run 'gitstyle run <username>' first to generate a wiki.[/dim]")
+        raise typer.Exit(1)
+
+    from gitstyle.serve import start_server
+
+    server = start_server(wiki_dir, port)
+    url = f"http://127.0.0.1:{port}"
+    console.print(Panel(
+        f"[bold]gitstyle viewer[/bold]\n"
+        f"Serving [cyan]{wiki_dir}[/cyan] at [link={url}]{url}[/link]\n"
+        f"Press [bold]Ctrl+C[/bold] to stop.",
+        border_style="blue",
+    ))
+
+    if not no_open:
+        import webbrowser
+        webbrowser.open(url)
 
     try:
-        run_server(wiki_dir, port, no_open=no_open)
-    except FileNotFoundError as e:
-        console.print(f"[red]{e}[/red]")
-        raise typer.Exit(1)
+        server.serve_forever()
+    except KeyboardInterrupt:
+        console.print("\n[dim]Server stopped.[/dim]")
+        server.server_close()
 
 
 @app.command()
-def version() -> None:
-    """Show version."""
-    console.print(f"gitstyle v{__version__}")
+def clean(
+    cache_dir: Path = typer.Option(Path(".gitstyle"), "--cache"),
+):
+    """Remove cached intermediate files."""
+    import shutil
+    if cache_dir.exists():
+        shutil.rmtree(cache_dir)
+        console.print(f"[green]Removed {cache_dir}[/green]")
+    else:
+        console.print("[dim]Nothing to clean[/dim]")
 
 
-def main() -> None:
-    app()
+def _run_pipeline(config: GitStyleConfig) -> None:
+    from gitstyle.compile import compile_wiki
+    from gitstyle.extract import extract
+    from gitstyle.fetch import fetch
+    from gitstyle.lint import lint
+    from gitstyle.sample import sample
+    from gitstyle.wiki_writer import write_wiki
+
+    # Stage 1: Fetch
+    console.rule("[bold blue]Stage 1: Fetch")
+    commits = fetch(config)
+
+    # Stage 2: Sample
+    console.rule("[bold blue]Stage 2: Sample")
+    clusters = sample(commits, config)
+
+    # Stage 3: Extract
+    console.rule("[bold blue]Stage 3: Extract")
+    extractions = extract(clusters, config)
+
+    # Stage 4: Compile
+    console.rule("[bold blue]Stage 4: Compile")
+    articles = compile_wiki(extractions, config)
+
+    # Stage 5: Lint
+    console.rule("[bold blue]Stage 5: Lint")
+    lint_report = lint(articles, config)
+
+    # Write wiki
+    console.rule("[bold blue]Writing Wiki")
+    wiki_path = write_wiki(articles, lint_report, config)
+
+    console.print()
+    console.print(Panel(
+        f"[bold green]Done![/bold green]\n"
+        f"Wiki written to [cyan]{wiki_path}[/cyan]\n"
+        f"Open in Obsidian or any markdown viewer.",
+        border_style="green",
+    ))
