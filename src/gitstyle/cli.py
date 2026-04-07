@@ -187,6 +187,22 @@ def fetch(
 
 
 @app.command()
+def serve(
+    wiki_dir: Path = typer.Argument(Path("wiki"), help="Path to a gitstyle wiki directory"),
+    port: int = typer.Option(8080, "--port", "-p", help="Port to serve on"),
+    no_open: bool = typer.Option(False, "--no-open", help="Don't open browser automatically"),
+) -> None:
+    """Launch a local web viewer for a gitstyle wiki."""
+    from gitstyle.serve import run_server
+
+    try:
+        run_server(wiki_dir, port, no_open=no_open)
+    except FileNotFoundError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
 def version() -> None:
     """Show version."""
     console.print(f"gitstyle v{__version__}")

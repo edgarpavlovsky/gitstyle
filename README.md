@@ -14,7 +14,7 @@ Every developer and engineering org has a style: naming conventions, error handl
 
 Works for individual developers and GitHub organizations — gitstyle auto-detects which and adjusts its analysis accordingly.
 
-The output is plain markdown — no tool lock-in, no proprietary format. It works with Obsidian for browsing, with any coding agent for context, or as standalone documentation of your engineering preferences.
+The output is plain markdown — no tool lock-in, no proprietary format. Browse it with the built-in web viewer (`gitstyle serve`), Obsidian, any coding agent, or as standalone documentation of your engineering preferences.
 
 ## Install
 
@@ -109,6 +109,28 @@ Not every commit goes through the LLM. gitstyle clusters commits by repo and lan
 
 Configurable via `--strategy` (`balanced`, `recent`, `largest`) and `--max-samples`.
 
+## Web Viewer
+
+gitstyle includes a built-in web viewer with an interactive knowledge graph:
+
+```bash
+# Launch the viewer (opens browser automatically)
+gitstyle serve
+
+# Serve a specific wiki directory
+gitstyle serve examples/karpathy
+
+# Custom port, no auto-open
+gitstyle serve wiki/ --port 3000 --no-open
+```
+
+The viewer has two modes:
+
+- **Graph view** (default) — Interactive force-directed graph showing how articles connect. Nodes are color-coded by category (gold = index, blue = style, green = language, gray = meta). Click any node to read the article. Hover to highlight connections.
+- **Article view** — Clean rendered markdown with syntax highlighting, confidence badges, and clickable wikilinks.
+
+Dark theme. Zero dependencies — uses your browser and CDN-loaded libraries. Works offline with graceful degradation.
+
 ## How to Plug Into Your Coding Agent
 
 ### Claude Code
@@ -177,6 +199,9 @@ gitstyle run <username> [options]
 # Fetch only (useful for inspecting data before running full pipeline)
 gitstyle fetch <username>
 
+# Launch web viewer with interactive graph
+gitstyle serve [wiki_dir]
+
 # Show version
 gitstyle version
 ```
@@ -198,6 +223,8 @@ gitstyle version
 | `--exclude-repos` | — | Comma-separated repos to exclude |
 | `--strategy` | `balanced` | Sampling: balanced, recent, largest |
 | `--skip-lint` | `false` | Skip lint stage |
+| `--port, -p` | `8080` | Port for `serve` command |
+| `--no-open` | `false` | Don't auto-open browser (`serve`) |
 
 ### Environment Variables
 
