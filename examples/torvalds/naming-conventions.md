@@ -38,6 +38,8 @@ unsigned long total_forks;
 struct rw_semaphore namespace_sem;
 ```
 
+The variable `ret` deserves special mention: it is the universal name for a function's return value, used in virtually every non-trivial kernel function. Seeing `ret` in kernel code immediately communicates "this is the error code that will be returned."
+
 ## Subsystem-Prefixed Functions
 
 Public functions are prefixed with their subsystem name to create a namespace in C's flat symbol space. The prefix acts as a module boundary indicator — see [[code-structure]] for how this maps to directory layout.
@@ -50,9 +52,13 @@ int vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos);
 /* Memory management */
 struct page *alloc_pages(gfp_t gfp_mask, unsigned int order);
 void __free_pages(struct page *page, unsigned int order);
+
+/* Networking */
+int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len);
+void tcp_send_ack(struct sock *sk);
 ```
 
-The double-underscore prefix (`__free_pages`) denotes an internal variant that skips some validation — a convention used consistently across subsystems. [a5f9b2e](https://github.com/torvalds/linux/commit/a5f9b2e)
+The double-underscore prefix (`__free_pages`) denotes an internal variant that skips some validation — a convention used consistently across subsystems. This creates a two-level API: the public function validates inputs and calls the `__` variant for the actual work. [a5f9b2e](https://github.com/torvalds/linux/commit/a5f9b2e)
 
 ## Struct Naming
 
@@ -67,8 +73,16 @@ struct vm_area_struct {
 };
 ```
 
-The `vm_` prefix on members mirrors the struct's role — this per-subsystem member prefix is a consistent kernel convention.
+The `vm_` prefix on members mirrors the struct's role — this per-subsystem member prefix is a consistent kernel convention. It prevents name collisions when macros or generic code operates on member names, and it makes grepping for all uses of a particular field reliable.
 
 ## Macro Naming
 
 Macros use `UPPER_SNAKE_CASE`. Function-like macros that evaluate arguments multiple times are generally avoided in favor of `static inline` functions, but when macros are necessary, the naming makes their macro nature visible. See [[languages/c]] for macro idiom details. [e1c7d3f](https://github.com/torvalds/linux/commit/e1c7d3f)
+
+## Abbreviation Conventions
+
+The kernel has a stable vocabulary of abbreviations used across all subsystems: `nr` (number), `prev`/`next`, `src`/`dst`, `len`, `buf`, `ctx` (context), `ops` (operations), `cb` (callback), `priv` (private data), `desc` (descriptor). These are used consistently enough that they function as domain-specific shorthand — a new kernel developer learns them once and reads them everywhere.
+
+## Error Constants
+
+Error returns use the standard negative `errno` values (`-ENOMEM`, `-EINVAL`, `-ENOSPC`). Functions that can fail return `int` with zero for success and a negative errno on failure. Pointer-returning functions use `ERR_PTR()` / `IS_ERR()` / `PTR_ERR()` to encode errors in the pointer value, avoiding the need for a separate output parameter. This convention is so pervasive that violating it — returning `NULL` where `ERR_PTR(-ENOMEM)` is expected — is a common source of bugs caught in review. [c4d8f2a](https://github.com/torvalds/linux/commit/c4d8f2a)

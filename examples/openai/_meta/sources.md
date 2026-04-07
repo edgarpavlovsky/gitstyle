@@ -21,36 +21,30 @@ last_updated: 2026-04-07
 
 ## Sampling Notes
 
-- **openai-python**: Highest-signal repo for SDK conventions. Many commits are Stainless-generated — style patterns were extracted from both generated and hand-written code, noting the distinction
+- **openai-python**: Highest-signal SDK repo. Many commits are Stainless-generated; style patterns were extracted from both generated and hand-written code, noting the distinction throughout
 - **openai-node**: Mirrors openai-python architecturally. Sampled to validate cross-language SDK consistency and extract TypeScript-specific idioms
-- **tiktoken**: Small but high-signal for the Rust+Python hybrid pattern. Every commit is hand-written
-- **whisper**: Core research repo. Most commits are from the initial release; post-release commits are community fixes and model updates
-- **CLIP**: Small commit count but represents the "research code" archetype clearly. Included to establish the research vs. SDK contrast
-- **gym**: Largest commit history among research repos due to its long active lifespan and community contributions. Sampled 250 most recent and most impactful
-- **openai-cookbook**: Sampled for documentation patterns and recommended usage idioms. Not a code library but shapes how the org communicates patterns
-- **triton**: Very large commit history. Sampled focused on Python DSL frontend and build system, not deep MLIR internals
+- **tiktoken**: Small but high-signal for the Rust+PyO3 hybrid pattern and the `_educational.py` dual-implementation approach. Every commit is hand-written
+- **whisper**: Core research archetype. Most commits from initial release; post-release commits are community fixes and model updates
+- **CLIP**: Small commit count but cleanly represents research code conventions. Included to establish the research vs. SDK contrast
+- **gym**: Longest-lived research repo with the most community contributions. Sampled 250 most recent and most impactful. Its interface patterns became industry-standard for RL
+- **openai-cookbook**: Sampled for documentation patterns and recommended usage idioms
+- **triton**: Compiler outlier — LLVM/MLIR conventions unrelated to the rest of the org. Sampled focused on Python DSL frontend and build system
 
 ## Excluded Repositories
 
-- **openai/evals**: Evaluation framework — patterns overlap with SDK, less distinctive
-- **openai/shap-e**: Small research release, limited commit signal
-- **openai/point-e**: Small research release, similar to CLIP in structure
-- **openai/consistency_models**: Research release with minimal post-publication activity
-- **openai/gpt-2**: Archived/legacy, does not represent current conventions
-- **openai/baselines**: Archived RL code, superseded by gym patterns
+- **openai/evals**: Evaluation framework — patterns overlap with SDK
+- **openai/shap-e, point-e, consistency_models**: Small research releases, limited commit signal
+- **openai/gpt-2, baselines**: Archived/legacy, not representative of current conventions
 
 ## Coverage Gaps
 
-- **Private repositories**: OpenAI's internal codebases (GPT training infrastructure, API server, RLHF pipeline) are not on GitHub — only public repositories are analyzed
-- **Model training code**: No public repository contains production model training code; whisper and CLIP represent research training only
-- **Infrastructure code**: Deployment, scaling, and serving code is private
-- **Go/Rust services**: OpenAI likely uses Go and Rust for backend services, but no public repos expose these patterns
+- **Private repositories**: Internal codebases (training infrastructure, API server, RLHF pipeline) are not public
+- **Model training code**: No public repo contains production training code
+- **Go/Rust services**: Likely used for backend services, but no public repos expose these
 
 ## Confidence Impact
 
-Articles grounded in SDK code (e.g., [[patterns]], [[type-discipline]], [[naming-conventions]]) have the highest confidence due to high commit volume and consistent conventions. Articles extrapolating from research code (e.g., [[testing]] for research repos) have lower confidence due to smaller sample size and higher variance between repos. The [[commit-hygiene]] article bridges both categories and notes where conventions diverge.
-
-The gym repository provides strong signal for interface design patterns but represents a mature/archived project — its conventions may not reflect current organizational direction.
+Articles grounded in SDK code ([[patterns]], [[type-discipline]], [[naming-conventions]]) have highest confidence due to high commit volume and consistent (generated) conventions. Articles covering research code ([[testing]]) have lower confidence due to smaller samples and higher variance. Gym provides strong interface-design signal but is archived and may not reflect current direction.
 
 **Total commits fetched:** 6,372
 **Total commits sampled:** 1,252

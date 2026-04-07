@@ -9,9 +9,9 @@ last_updated: 2026-04-07
 
 # Type Discipline
 
-## Comprehensive Type Hints in Python
+## Exhaustive Type Hints in Python
 
-Anthropic's Python SDK annotates every public function signature, every class attribute, and every return type. This is not selective typing — it is exhaustive. Method signatures include `Literal` types for string enums, `Optional` for nullable fields, `Union` for polymorphic content blocks, and `overload` decorators for methods with multiple return type signatures. [a3f7c21](https://github.com/anthropics/anthropic-sdk-python/commit/a3f7c21)
+The Python SDK annotates every public function signature, every class attribute, and every return type. This is not selective typing — it is exhaustive. Method signatures include `Literal` types for string enums, `Optional` for nullable fields, `Union` for polymorphic content blocks, and `overload` decorators for methods with multiple return type signatures. [a3f7c21](https://github.com/anthropics/anthropic-sdk-python/commit/a3f7c21)
 
 ```python
 def create(
@@ -31,9 +31,9 @@ def create(
     ...
 ```
 
-There are no `Any` escape hatches in public API signatures. Internal utilities may use `Any` for truly generic helpers, but the public surface is fully typed. See [[languages/python]] for the typing patterns specific to the Python SDK.
+No `Any` escape hatches in public API signatures. `Any` appears only in internal helper modules (`_compat.py`, `_utils.py`) where Python's type system genuinely cannot express the constraint. The public types directory and resource modules are `Any`-free. [b5e7f93](https://github.com/anthropics/anthropic-sdk-python/commit/b5e7f93)
 
-## Literal Types for String Enums
+## Literal Types Over Enums
 
 Rather than Python `Enum` classes, Anthropic uses `Literal` types for string-valued enumerations. This keeps the runtime representation as plain strings while providing static type checking. [d7f3a62](https://github.com/anthropics/anthropic-sdk-python/commit/d7f3a62)
 
@@ -43,26 +43,13 @@ MessageRole = Literal["user", "assistant"]
 ContentBlockType = Literal["text", "tool_use", "tool_result", "image"]
 ```
 
-This pattern avoids the serialization overhead and user-facing complexity of enum classes. Users pass plain strings (`"end_turn"`) and get plain strings back, but mypy and pyright still catch typos at analysis time.
+Users pass plain strings (`"end_turn"`) and get plain strings back, but mypy and pyright catch typos at analysis time. No serialization overhead, no `.value` access, no import required at the call site. This is a Stainless convention that works especially well for generated SDKs — the `Literal` types are derived directly from the OpenAPI spec's enum definitions.
 
-## TypeScript Strict Mode Everywhere
+## TypeScript Strict Mode
 
-The TypeScript SDK enables strict mode in `tsconfig.json`: `strict: true`, which activates `strictNullChecks`, `strictFunctionTypes`, `strictBindCallApply`, `noImplicitAny`, and `noImplicitThis`. There are no `// @ts-ignore` or `as any` casts in the public codebase. [b8e4a19](https://github.com/anthropics/anthropic-sdk-typescript/commit/b8e4a19)
+The TypeScript SDK enables `strict: true` in `tsconfig.json`, activating `strictNullChecks`, `strictFunctionTypes`, `noImplicitAny`, and related flags. No `// @ts-ignore` or `as any` casts in the public codebase. [b8e4a19](https://github.com/anthropics/anthropic-sdk-typescript/commit/b8e4a19)
 
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "target": "ES2020",
-    "moduleResolution": "node",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true
-  }
-}
-```
-
-See [[languages/typescript]] for how strict mode interacts with the SDK's generic resource typing.
+See [[languages/typescript]] for how strict mode interacts with the SDK's generic resource typing and `noUncheckedIndexedAccess`.
 
 ## Discriminated Unions for Content Blocks
 
@@ -82,32 +69,13 @@ class ToolUseBlock(BaseModel):
     input: dict
 ```
 
-This enables exhaustive type narrowing: after checking `block.type == "text"`, type checkers know `block` is a `TextBlock` and can access `.text` without casts. The pattern carries through to streaming events, where `MessageStreamEvent` is a union discriminated on `type`.
+After checking `block.type == "text"`, type checkers know `block` is a `TextBlock` and allow `.text` access without casts. The pattern carries through to streaming events, where `MessageStreamEvent` is a union discriminated on `type`. This is where the `Literal` types over enums decision pays off — discriminated union narrowing works cleanly with string literals.
 
-## Pydantic for Runtime Validation
+## BaseModel for Responses, TypedDict for Requests
 
-Response models inherit from Pydantic `BaseModel`, providing both static type checking and runtime validation. When the API returns a response, it is parsed through the Pydantic model, which validates types, coerces compatible values, and raises `ValidationError` on schema mismatches. [d7f3a62](https://github.com/anthropics/anthropic-sdk-python/commit/d7f3a62)
+Response models inherit from Pydantic `BaseModel`, providing runtime validation and JSON parsing. When the API returns a response, it is parsed through the model, which validates types, coerces compatible values, and raises `ValidationError` on schema mismatches. The `extra="allow"` config enables forward compatibility — unknown fields from API updates are silently accepted. [d7f3a62](https://github.com/anthropics/anthropic-sdk-python/commit/d7f3a62)
 
-```python
-class Usage(BaseModel):
-    input_tokens: int
-    output_tokens: int
-
-class Message(BaseModel):
-    id: str
-    type: Literal["message"]
-    role: Literal["assistant"]
-    content: List[ContentBlock]
-    model: str
-    stop_reason: Optional[StopReason]
-    usage: Usage
-```
-
-This dual-layer approach (static types + runtime validation) catches both programmer errors and API contract violations. If the API adds a new field, existing models pass validation via `model_config = ConfigDict(extra="allow")`.
-
-## TypedDict for Request Parameters
-
-Request parameter types use `TypedDict` rather than `BaseModel`. This is a deliberate design choice: request bodies are constructed by the SDK user and should not be validated by the SDK (the API server validates them). `TypedDict` provides IDE completion and static checking without runtime overhead. [f4a1c39](https://github.com/anthropics/anthropic-sdk-python/commit/f4a1c39)
+Request parameter types use `TypedDict` with `Required[]` markers. This is deliberate: request bodies are constructed by the user and validated by the API server, not the SDK. `TypedDict` provides IDE completion and static checking without runtime overhead. [f4a1c39](https://github.com/anthropics/anthropic-sdk-python/commit/f4a1c39)
 
 ```python
 class MessageCreateParams(TypedDict, total=False):
@@ -117,11 +85,10 @@ class MessageCreateParams(TypedDict, total=False):
     metadata: Optional[MessageCreateParams.Metadata]
     stop_sequences: Optional[List[str]]
     stream: Optional[bool]
-    system: Optional[Union[str, Iterable[TextBlockParam]]]
     temperature: Optional[float]
 ```
 
-The `total=False` with selective `Required[]` markers means only mandatory parameters must be provided. Optional parameters can be omitted entirely rather than set to `None`.
+The `total=False` with selective `Required[]` means only mandatory parameters must be provided. Optional parameters can be omitted entirely rather than set to `None`. This split — immutable validated responses, lightweight typed requests — is a Stainless pattern that matches API SDK semantics precisely.
 
 ## Generic Resource Typing
 
@@ -140,8 +107,8 @@ class SyncAPIResource:
         ...
 ```
 
-This eliminates manual casting. When `Messages.create` calls `self._post(..., cast_to=Message)`, the return type is inferred as `Message` without an explicit annotation on `create`'s return type. The type flows through.
+This eliminates manual casting. When `Messages.create` calls `self._post(..., cast_to=Message)`, the return type is inferred as `Message` without an explicit annotation. The type flows through the generic.
 
-## No `Any` in Public API
+## Cross-SDK Type Philosophy
 
-A grep for `Any` across the Python SDK's public surface returns zero results. `Any` appears only in internal helper modules (`_compat.py`, `_utils.py`) where it is genuinely unavoidable due to Python's type system limitations. The public types directory and resource modules are `Any`-free. [b5e7f93](https://github.com/anthropics/anthropic-sdk-python/commit/b5e7f93)
+The typing strategies in Python and TypeScript serve the same goal through different mechanisms. Python uses Pydantic `BaseModel` for runtime validation and `Literal` types for static narrowing. TypeScript uses `readonly` interfaces for immutability and discriminated unions for compile-time exhaustiveness. Both avoid escape hatches (`Any` in Python, `any` in TypeScript) in public APIs. The result: users in either language get full IDE completion, catch typos at analysis time, and can trust the types to match the API wire format. This cross-language type parity is what makes "write documentation once, transliterate between languages" viable for Anthropic's developer relations team.

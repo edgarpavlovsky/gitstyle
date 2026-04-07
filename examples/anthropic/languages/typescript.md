@@ -11,7 +11,7 @@ last_updated: 2026-04-07
 
 ## Strict Mode Without Escape Hatches
 
-The TypeScript SDK ships with `strict: true` in `tsconfig.json` and treats any `// @ts-ignore`, `// @ts-expect-error`, or `as any` as a code review red flag. The codebase compiles cleanly under strict mode — no suppressions needed. [b8e4a19](https://github.com/anthropics/anthropic-sdk-typescript/commit/b8e4a19)
+The TypeScript SDK ships with `strict: true` in `tsconfig.json` and treats `// @ts-ignore`, `// @ts-expect-error`, and `as any` as code review red flags. The codebase compiles cleanly under strict mode without suppressions. [b8e4a19](https://github.com/anthropics/anthropic-sdk-typescript/commit/b8e4a19)
 
 ```json
 {
@@ -29,11 +29,11 @@ The TypeScript SDK ships with `strict: true` in `tsconfig.json` and treats any `
 }
 ```
 
-The `noUncheckedIndexedAccess` flag is enabled, meaning index access on arrays and records returns `T | undefined`, forcing explicit null checks. This catches a common class of runtime errors at compile time.
+The `noUncheckedIndexedAccess` flag forces index access on arrays and records to return `T | undefined`, requiring explicit null checks. This catches a common class of runtime errors at compile time. This strictness is a Stainless default — the same tsconfig pattern appears in OpenAI's TypeScript SDK.
 
 ## Async Iterables for Streaming
 
-Streaming in the TypeScript SDK uses async iterables (`for await...of`), the native JavaScript pattern for consuming async sequences. The `MessageStream` class implements `Symbol.asyncIterator`, making it usable with `for await`. [c4d2e87](https://github.com/anthropics/anthropic-sdk-typescript/commit/c4d2e87)
+Streaming uses async iterables (`for await...of`), the native JavaScript pattern for consuming async sequences. The `MessageStream` class implements `Symbol.asyncIterator`. [c4d2e87](https://github.com/anthropics/anthropic-sdk-typescript/commit/c4d2e87)
 
 ```typescript
 const stream = client.messages.stream({
@@ -49,11 +49,11 @@ for await (const event of stream) {
 }
 ```
 
-The stream also exposes convenience methods: `stream.on("text", callback)` for event-based consumption and `await stream.finalMessage()` for collecting the full response. Both patterns are fully typed.
+The stream also exposes `stream.on("text", callback)` for event-based consumption and `await stream.finalMessage()` for collecting the full response. Both patterns are fully typed. The convenience methods are hand-written on top of Stainless's generated streaming infrastructure.
 
 ## Discriminated Union Types
 
-Content blocks, stream events, and error responses use TypeScript discriminated unions with the `type` field as discriminant. This enables exhaustive narrowing with `switch` statements that TypeScript can verify at compile time. [b8e4a19](https://github.com/anthropics/anthropic-sdk-typescript/commit/b8e4a19)
+Content blocks, stream events, and error responses use discriminated unions with `type` as the discriminant. TypeScript verifies exhaustive handling at compile time. [b8e4a19](https://github.com/anthropics/anthropic-sdk-typescript/commit/b8e4a19)
 
 ```typescript
 type ContentBlock = TextBlock | ToolUseBlock;
@@ -70,25 +70,23 @@ interface ToolUseBlock {
   input: Record<string, unknown>;
 }
 
-// exhaustive narrowing
 function handleBlock(block: ContentBlock): string {
   switch (block.type) {
     case "text":
-      return block.text; // TypeScript knows block is TextBlock
+      return block.text;
     case "tool_use":
-      return `Tool: ${block.name}`; // TypeScript knows block is ToolUseBlock
+      return `Tool: ${block.name}`;
   }
 }
 ```
 
-The `switch` is exhaustive — adding a new variant to `ContentBlock` without handling it in existing switches produces a compile error. This pattern is used throughout the SDK for any polymorphic API type.
+Adding a new variant to `ContentBlock` without handling it in existing switches produces a compile error. This pattern is used throughout the SDK for any polymorphic API type.
 
 ## Interface Mirroring the Python SDK
 
-The TypeScript SDK's public API mirrors the Python SDK as closely as language differences allow. Method names, parameter structures, and resource hierarchies are kept in sync. The differences are only where TypeScript conventions demand it: camelCase method names, kebab-case filenames, `Promise<T>` return types. [c4d2e87](https://github.com/anthropics/anthropic-sdk-typescript/commit/c4d2e87)
+The TypeScript SDK's public API mirrors the Python SDK as closely as language differences allow. Resource hierarchies, method semantics, and type structures are kept in sync. The differences are only where TypeScript conventions demand: camelCase method names, kebab-case filenames, `Promise<T>` return types. [c4d2e87](https://github.com/anthropics/anthropic-sdk-typescript/commit/c4d2e87)
 
 ```typescript
-// TypeScript — mirrors Python SDK structure
 const client = new Anthropic();
 const message = await client.messages.create({
   model: "claude-sonnet-4-20250514",
@@ -97,11 +95,11 @@ const message = await client.messages.create({
 });
 ```
 
-This cross-language parity means documentation examples can be "transliterated" between languages with minimal changes. See [[code-structure]] for how the directory layouts are kept in parallel.
+This cross-language parity — a direct consequence of both SDKs being generated from the same Stainless API spec — means documentation examples transliterate between languages with minimal changes. See [[code-structure]] for how directory layouts are kept parallel.
 
 ## `Record<string, unknown>` Over `any`
 
-Where untyped data is unavoidable (e.g., tool use `input` payloads), the SDK uses `Record<string, unknown>` rather than `any`. This forces consumers to narrow the type before using the data, preventing silent type errors. [b8e4a19](https://github.com/anthropics/anthropic-sdk-typescript/commit/b8e4a19)
+Where untyped data is unavoidable (e.g., tool use `input` payloads), the SDK uses `Record<string, unknown>` rather than `any`. This forces consumers to narrow before using the data. [b8e4a19](https://github.com/anthropics/anthropic-sdk-typescript/commit/b8e4a19)
 
 ```typescript
 interface ToolUseBlock {
@@ -120,7 +118,7 @@ if (typeof location === "string") {
 
 ## ESM and CJS Dual Publishing
 
-The TypeScript SDK publishes both ESM and CommonJS builds. The `package.json` uses `exports` with conditional `import` and `require` paths. This ensures compatibility across Node.js, bundlers (webpack, esbuild, rollup), and edge runtimes (Cloudflare Workers, Deno). [e9a3d56](https://github.com/anthropics/anthropic-sdk-typescript/commit/e9a3d56)
+The SDK publishes both ESM and CommonJS builds via `exports` with conditional `import` and `require` paths. This ensures compatibility across Node.js, bundlers (webpack, esbuild, rollup), and edge runtimes (Cloudflare Workers, Deno). [e9a3d56](https://github.com/anthropics/anthropic-sdk-typescript/commit/e9a3d56)
 
 ```json
 {
@@ -136,7 +134,7 @@ The TypeScript SDK publishes both ESM and CommonJS builds. The `package.json` us
 
 ## Error Classes Extend `Error` Properly
 
-All error classes extend `Error` with proper prototype chain restoration — the `Object.setPrototypeOf(this, ClassName.prototype)` pattern that is necessary in TypeScript when extending built-in classes. This ensures `instanceof` checks work correctly. [c9b4d15](https://github.com/anthropics/anthropic-sdk-typescript/commit/c9b4d15)
+All error classes extend `Error` with `Object.setPrototypeOf(this, ClassName.prototype)` — the pattern necessary in TypeScript when extending built-in classes. Without this, `instanceof` checks silently fail. [c9b4d15](https://github.com/anthropics/anthropic-sdk-typescript/commit/c9b4d15)
 
 ```typescript
 export class APIError extends Error {
@@ -152,7 +150,7 @@ export class APIError extends Error {
 }
 ```
 
-This is a known TypeScript footgun — without `Object.setPrototypeOf`, `catch (e) { if (e instanceof APIError) }` silently fails. Anthropic handles it correctly across all error subclasses.
+This is a known TypeScript footgun that Anthropic (and all Stainless-generated SDKs) handle correctly across every error subclass.
 
 ## Branded Types for IDs
 
@@ -163,11 +161,11 @@ type MessageId = string & { readonly __brand: "MessageId" };
 type ContentBlockId = string & { readonly __brand: "ContentBlockId" };
 ```
 
-This is a compile-time-only construct — at runtime these are plain strings. The branding prevents accidental interchange without any runtime overhead.
+At runtime these are plain strings. The branding prevents accidental interchange at compile time without runtime overhead.
 
 ## `readonly` by Default on Response Types
 
-Response interfaces use `readonly` on all properties, signaling that response objects are immutable data structures, not mutable state containers. This aligns with the Python SDK's use of Pydantic `BaseModel` (which is similarly immutable by convention). [c4d2e87](https://github.com/anthropics/anthropic-sdk-typescript/commit/c4d2e87)
+Response interfaces use `readonly` on all properties, signaling that response objects are immutable data. This aligns with the Python SDK's Pydantic `BaseModel` (similarly immutable by convention). [c4d2e87](https://github.com/anthropics/anthropic-sdk-typescript/commit/c4d2e87)
 
 ```typescript
 interface Message {

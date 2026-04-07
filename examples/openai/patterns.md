@@ -9,34 +9,27 @@ last_updated: 2026-04-07
 
 # Patterns & Architecture
 
-## Resource Client Pattern (SDKs)
+## Resource Client Pattern (SDKs, Stainless-Generated)
 
-The central architectural pattern in OpenAI's SDKs is the resource client, directly borrowed from Stripe's API design. A top-level `OpenAI` client holds resource objects as attributes, and each resource exposes CRUD methods. [a3f7e21](https://github.com/openai/openai-python/commit/a3f7e21)
+The central SDK pattern is the resource client, borrowed from Stripe's API design via the Stainless code generator. A top-level `OpenAI` client holds resource objects as attributes; each resource exposes CRUD methods that delegate to `self._post()`, `self._get()`, `self._delete()` on a shared HTTP client. The resource classes are thin routing layers — authentication, retries, and response parsing all live in the base client. [a3f7e21](https://github.com/openai/openai-python/commit/a3f7e21) [b8c4d19](https://github.com/openai/openai-python/commit/b8c4d19)
 
 ```python
 client = OpenAI()
-
-# resource access via attribute chain
 completion = client.chat.completions.create(
     model="gpt-4",
     messages=[{"role": "user", "content": "Hello"}]
 )
-
-# nested resources use dot notation
 job = client.fine_tuning.jobs.create(
     training_file="file-abc123",
     model="gpt-4o-mini"
 )
 ```
 
-Every resource method ultimately delegates to `self._post()`, `self._get()`, `self._delete()` on the base client, which handles authentication, retries, and response parsing. This single-dispatch-through-HTTP pattern keeps the resource classes thin — they are routing layers over a shared HTTP client. [b8c4d19](https://github.com/openai/openai-python/commit/b8c4d19)
-
 ## Server-Sent Events Streaming
 
-OpenAI standardizes on Server-Sent Events (SSE) for streaming responses across both SDKs. The `stream=True` parameter switches the return type from a concrete model to an iterator of delta chunks. The implementation uses a custom SSE parser rather than a third-party library. [c7a3e18](https://github.com/openai/openai-python/commit/c7a3e18)
+Both SDKs use SSE for streaming, with a custom parser rather than a third-party library. The `stream=True` parameter switches the return type from a concrete model to a typed iterator of delta chunks. The Python SDK wraps this in `Stream[ChatCompletionChunk]`; the Node SDK returns `AsyncIterable<ChatCompletionChunk>`. Both provide `.close()` for early termination. [c7a3e18](https://github.com/openai/openai-python/commit/c7a3e18) [d2f1a93](https://github.com/openai/openai-python/commit/d2f1a93)
 
 ```python
-# streaming returns an iterator of typed chunks
 stream = client.chat.completions.create(
     model="gpt-4",
     messages=[{"role": "user", "content": "Count to 10"}],
@@ -47,21 +40,11 @@ for chunk in stream:
         print(chunk.choices[0].delta.content, end="")
 ```
 
-The Python SDK wraps this in a `Stream[ChatCompletionChunk]` generic type, and the Node SDK returns an `AsyncIterable<ChatCompletionChunk>`. Both provide `.close()` for early termination. The async variants yield from an async iterator. [d2f1a93](https://github.com/openai/openai-python/commit/d2f1a93)
+## Structured Error Hierarchy (Stainless-Generated)
 
-## Structured Error Hierarchy
-
-SDK error handling uses a typed exception hierarchy rooted at `APIError`. Each HTTP status code maps to a specific exception class: `AuthenticationError` (401), `PermissionDeniedError` (403), `NotFoundError` (404), `RateLimitError` (429), `InternalServerError` (>=500). [e5b7c41](https://github.com/openai/openai-python/commit/e5b7c41)
+SDK error handling uses a typed exception hierarchy rooted at `APIError`, with each HTTP status code mapped to a specific class: `AuthenticationError` (401), `PermissionDeniedError` (403), `NotFoundError` (404), `RateLimitError` (429), `InternalServerError` (>=500). This mirrors Stripe's `stripe.error` hierarchy — it is a Stainless convention, not an OpenAI-specific design. Each exception carries `status_code`, `message`, `body`, and `code` for programmatic handling. [e5b7c41](https://github.com/openai/openai-python/commit/e5b7c41)
 
 ```python
-from openai import (
-    APIError,
-    APIConnectionError,
-    RateLimitError,
-    AuthenticationError,
-    BadRequestError,
-)
-
 try:
     client.chat.completions.create(...)
 except RateLimitError:
@@ -71,48 +54,26 @@ except AuthenticationError:
 except APIConnectionError:
     # network-level failure
 except APIError as e:
-    # catch-all for other API errors
+    # catch-all
     print(e.status_code, e.message)
 ```
 
-This mirrors Stripe's `stripe.error` hierarchy. Each exception carries `status_code`, `message`, `body`, and `code` attributes for programmatic handling. See [[type-discipline]] for how these integrate with type checkers.
+## Automatic Retries with Exponential Backoff (Stainless-Generated)
 
-## Automatic Retries with Exponential Backoff
-
-Both SDKs implement automatic retry logic for transient failures (connection errors, 408, 409, 429, >=500). The default is 2 retries with exponential backoff. Retry count is configurable at client construction and per-request. [f8a2c64](https://github.com/openai/openai-python/commit/f8a2c64)
+Both SDKs retry transient failures (connection errors, 408, 409, 429, >=500) with exponential backoff, defaulting to 2 retries. Configurable at client construction and per-request. The retry logic respects `Retry-After` headers. This is Stainless-generated behavior, consistent across both SDKs. [f8a2c64](https://github.com/openai/openai-python/commit/f8a2c64)
 
 ```python
-# client-level default
 client = OpenAI(max_retries=5)
-
-# per-request override
-client.chat.completions.create(
-    ...,
-    max_retries=0  # disable retries for this call
-)
+client.chat.completions.create(..., max_retries=0)  # per-request override
 ```
-
-The retry logic respects `Retry-After` headers from 429 responses. This is Stainless-generated behavior, consistent across openai-python and openai-node.
 
 ## Keyword-Only Arguments in SDKs
 
-All SDK resource methods use keyword-only arguments (after `*` in Python, named options objects in TypeScript). Positional arguments are never accepted for API parameters. This prevents argument-order bugs and makes calls self-documenting. [a3f7e21](https://github.com/openai/openai-python/commit/a3f7e21)
+All SDK resource methods use keyword-only arguments (after `*` in Python, options objects in TypeScript). Positional arguments are never accepted for API parameters. This prevents argument-order bugs and makes calls self-documenting — a Stainless convention enforced across both SDKs. [a3f7e21](https://github.com/openai/openai-python/commit/a3f7e21)
 
-```python
-# correct — keyword-only
-client.chat.completions.create(
-    model="gpt-4",
-    messages=[...],
-    temperature=0.7,
-)
+## Research Code: Raw PyTorch nn.Module
 
-# this would raise TypeError — no positional args
-# client.chat.completions.create("gpt-4", [...])
-```
-
-## Research Code: PyTorch nn.Module Pattern
-
-Research repositories follow standard PyTorch conventions. Models inherit from `nn.Module`, define layers in `__init__`, and implement `forward()`. Whisper, CLIP, and gym's neural network policies all follow this pattern without deviation. [d4a1b38](https://github.com/openai/whisper/commit/d4a1b38)
+Research repos follow standard PyTorch conventions without deviation. Models inherit `nn.Module`, define layers in `__init__`, implement `forward()`. No Lightning, no Accelerate, no custom training frameworks — raw PyTorch throughout Whisper, CLIP, and gym's neural network policies. See [[dependencies]] for why. [d4a1b38](https://github.com/openai/whisper/commit/d4a1b38)
 
 ```python
 # whisper/model.py
@@ -132,31 +93,28 @@ class AudioEncoder(nn.Module):
         ...
 ```
 
-No custom training frameworks, no Lightning, no Accelerate wrappers — raw PyTorch. See [[dependencies]] for why.
-
 ## gym: Abstract Interface + Registry Pattern
 
-Gym established the interface + registry pattern that became standard for RL environments. The `Env` base class defines the contract (`step`, `reset`, `render`), and `gym.make("CartPole-v1")` resolves a string ID to a concrete class via a global registry. [f1a9d52](https://github.com/openai/gym/commit/f1a9d52)
+Gym established the interface + registry pattern that became the industry standard for RL environments. The `Env` base class defines the contract (`step`, `reset`, `render`); `gym.make("CartPole-v1")` resolves a string ID to a concrete class via a global registry. [f1a9d52](https://github.com/openai/gym/commit/f1a9d52)
 
 ```python
-# registration
 gym.register(
     id='CartPole-v1',
     entry_point='gym.envs.classic_control:CartPoleEnv',
     max_episode_steps=500,
 )
-
-# resolution
 env = gym.make('CartPole-v1')
 observation, info = env.reset()
 observation, reward, terminated, truncated, info = env.step(action)
 ```
 
-The wrapper pattern in gym is equally influential: `TimeLimit`, `RecordVideo`, `FlattenObservation` all decorate an `Env` instance, adding behavior without modifying the underlying environment. This is the decorator pattern applied at the application architecture level.
+The wrapper pattern is equally influential: `TimeLimit`, `RecordVideo`, `FlattenObservation` decorate an `Env` instance without modifying it — the decorator pattern applied at the application architecture level.
+
+The historical significance bears emphasizing: gym's `Env` interface and registry became the de facto standard for RL environments industry-wide. Gymnasium (the maintained fork), PettingZoo (multi-agent), and virtually every RL library since 2016 implements or extends gym's interface. The `step() -> (obs, reward, terminated, truncated, info)` signature is as canonical in RL as `forward()` is in PyTorch. Few open-source projects have defined an interface that an entire subfield adopted wholesale.
 
 ## Dataclass Configuration in Research Code
 
-Research repos use Python dataclasses for model configuration, similar to many ML projects. Whisper's `ModelDimensions` and CLIP's model constructors take configuration as structured data with explicit fields. [e7f2c83](https://github.com/openai/whisper/commit/e7f2c83)
+Research repos use `@dataclass` for model configuration rather than Pydantic `BaseModel`. The choice is deliberate: research code avoids the Pydantic dependency entirely, while SDK code leverages it for validation and serialization. This is one of the clearest markers for identifying which "side" of the org a piece of code comes from. See [[type-discipline]]. [e7f2c83](https://github.com/openai/whisper/commit/e7f2c83)
 
 ```python
 @dataclass
@@ -173,22 +131,9 @@ class ModelDimensions:
     n_text_layer: int
 ```
 
-This contrasts with the SDK code, which uses Pydantic `BaseModel` for all structured data. The choice is deliberate — research code avoids the Pydantic dependency, while SDK code leverages it for validation and serialization. See [[type-discipline]].
-
 ## Cookbook: Example-Driven Pattern Documentation
 
-The openai-cookbook repository functions as the organization's pattern library. Each Jupyter notebook demonstrates a complete use case: RAG, function calling, embeddings for search, fine-tuning workflows. Notebooks follow a consistent structure: motivation section, setup, step-by-step implementation, evaluation. [c1d4e87](https://github.com/openai/openai-cookbook/commit/c1d4e87)
-
-```python
-# typical cookbook cell structure:
-# Cell 1: imports and client setup
-# Cell 2: data preparation
-# Cell 3: API call with explanation
-# Cell 4: result processing
-# Cell 5: evaluation / visualization
-```
-
-The cookbook notably demonstrates patterns using multiple model providers — not just OpenAI's API but also open-source models — reflecting the organization's position as both an API provider and a contributor to the broader ecosystem.
+The openai-cookbook functions as a pattern library. Each Jupyter notebook demonstrates a complete use case (RAG, function calling, embeddings, fine-tuning) with a consistent structure: motivation, setup, step-by-step implementation, evaluation. [c1d4e87](https://github.com/openai/openai-cookbook/commit/c1d4e87)
 
 ## Context Manager Pattern for Resources
 
@@ -196,16 +141,9 @@ Both SDKs support context manager usage for automatic resource cleanup, particul
 
 ```python
 with client.chat.completions.create(
-    model="gpt-4",
-    messages=[...],
-    stream=True,
+    model="gpt-4", messages=[...], stream=True,
 ) as stream:
     for chunk in stream:
         print(chunk.choices[0].delta.content or "", end="")
 # connection automatically closed on exit
-
-# also for the client itself
-with OpenAI() as client:
-    client.chat.completions.create(...)
-# underlying httpx client closed
 ```

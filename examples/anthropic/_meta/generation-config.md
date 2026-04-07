@@ -8,7 +8,7 @@ last_updated: 2026-04-07
 
 ```yaml
 org: anthropics
-model: claude-sonnet-4-20250514
+model: claude-opus-4-20250514
 output_dir: wiki/
 max_commits: 500
 repos: null  # auto-discover
@@ -23,8 +23,8 @@ mode: org  # org wiki, not individual developer
 
 | Setting | Value |
 |---------|-------|
-| gitstyle version | 0.1.0 |
-| LLM model | claude-sonnet-4-20250514 |
+| gitstyle version | 0.2.0 |
+| LLM model | claude-opus-4-20250514 |
 | Max commits per repo | 500 |
 | Sample size per cluster | 25 |
 | Sample strategy | balanced (recent + largest + random) |

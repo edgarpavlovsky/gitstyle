@@ -26,7 +26,7 @@ last_updated: 2026-04-07
 // --- main() ---
 ```
 
-This mirrors the single-file Python pattern (see [[code-structure]]) and makes `gcc train_gpt2.c -o train_gpt2 -lm` the complete build command.
+This mirrors the single-file Python pattern (see [[code-structure]]) and makes `gcc train_gpt2.c -o train_gpt2 -lm` the complete build command. No Makefile, no cmake — the barrier to compilation is as low as the barrier to running `python train.py`.
 
 ## Structs as Namespaces
 
@@ -48,7 +48,7 @@ void gpt2_update(GPT2 *model, float learning_rate, float beta1, float beta2, flo
 void gpt2_free(GPT2 *model);
 ```
 
-The `gpt2_*` prefix convention creates a pseudo-namespace. Every function is prefixed with its "class."
+The `gpt2_*` prefix convention creates a pseudo-namespace. This is the C equivalent of `class GPT` with methods — same conceptual grouping, just expressed through naming convention rather than language syntax.
 
 ## Flat Memory Layout
 
@@ -63,7 +63,7 @@ model->params.wpe = params_memory + V * C;
 model->params.ln1w = params_memory + V * C + T * C;
 ```
 
-This is explicitly pedagogical — it forces the reader to understand exactly where each parameter lives in memory.
+This forces the reader to understand exactly where each parameter lives in memory — the same knowledge that PyTorch's `nn.Parameter` hides behind an abstraction. The flat layout also mirrors how GPU memory works, making the transition to the CUDA version conceptually straightforward.
 
 ## Manual BLAS
 
@@ -89,7 +89,7 @@ void matmul_forward(float* out, float* inp, float* weight, float* bias,
 }
 ```
 
-This is intentionally slow but completely transparent. The CUDA version uses optimized kernels but the C reference prioritizes readability over performance.
+This is intentionally slow but completely transparent. Every multiply-accumulate is visible. The CUDA version uses optimized kernels, but the C reference prioritizes readability — a reader can trace a single element through the entire matmul with pen and paper.
 
 ## Error Handling Via Immediate Exit
 
@@ -103,9 +103,11 @@ if (model_file == NULL) {
 }
 ```
 
+This matches the educational context: error recovery adds complexity without teaching anything about GPT-2. The only failure mode the reader should encounter is "fix the file path and re-run."
+
 ## Shape Comments Carry Over
 
-The `(B, T, C)` shape comment convention from Python appears identically in C code. This creates visual continuity between the Python reference and C implementation: [e8c3f1a](https://github.com/karpathy/llm.c/commit/e8c3f1a)
+The `(B, T, C)` shape comment convention from Python appears identically in C code. This creates visual continuity between the Python reference and C implementation — a reader who learned the shapes in nanoGPT can navigate llm.c by following the same annotations: [e8c3f1a](https://github.com/karpathy/llm.c/commit/e8c3f1a)
 
 ```c
 float* wte;  // (V, C)
@@ -124,3 +126,19 @@ int V = config.vocab_size;
 int L = config.num_layers;
 int C = config.channels;
 ```
+
+This eliminates argument parsing code entirely. The checkpoint file _is_ the configuration, which means there is exactly one way to configure the model: provide the right checkpoint.
+
+## Forward/Backward Symmetry
+
+The C code organizes forward and backward passes as paired functions. For every `*_forward` function there is a corresponding `*_backward` function with the same parameter layout: [e8c3f1a](https://github.com/karpathy/llm.c/commit/e8c3f1a)
+
+```c
+void layernorm_forward(float* out, float* mean, float* rstd, float* inp,
+                       float* weight, float* bias, int B, int T, int C);
+void layernorm_backward(float* dinp, float* dweight, float* dbias,
+                        float* dout, float* inp, float* weight, float* mean,
+                        float* rstd, int B, int T, int C);
+```
+
+This structural symmetry makes the backward pass navigable — the reader finds the backward function directly below its forward counterpart, and the parameter names share a consistent prefix (`d` for gradient). In PyTorch, autograd hides this pairing; in `llm.c`, it is explicit and visible.

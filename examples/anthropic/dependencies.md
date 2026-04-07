@@ -11,7 +11,7 @@ last_updated: 2026-04-07
 
 ## httpx as the HTTP Foundation (Python)
 
-Anthropic's Python SDK is built on `httpx`, not `requests`. This is a deliberate choice: httpx provides native async support (`httpx.AsyncClient`), HTTP/2, and streaming response iteration — all requirements for an SDK that is async-first and streaming-first. [a3f7c21](https://github.com/anthropics/anthropic-sdk-python/commit/a3f7c21)
+The Python SDK is built on `httpx`, not `requests`. httpx provides native async support (`httpx.AsyncClient`), HTTP/2, and streaming response iteration — all requirements for an SDK that is async-first and streaming-first. This is a Stainless default: all Stainless-generated Python SDKs use httpx. [a3f7c21](https://github.com/anthropics/anthropic-sdk-python/commit/a3f7c21)
 
 ```python
 # from _base_client.py
@@ -24,11 +24,11 @@ class AsyncHttpxClientWrapper:
     _client: httpx.AsyncClient
 ```
 
-The httpx client is wrapped but not abstracted away — the SDK's transport layer is thin enough that httpx idioms (timeouts, transport configuration, proxy settings) pass through to users who need them.
+The httpx client is wrapped but not abstracted away — httpx idioms (timeouts, transport configuration, proxy settings) pass through to users who need them.
 
 ## Pydantic for Data Modeling (Python)
 
-All API response types are Pydantic v2 `BaseModel` subclasses. Anthropic uses Pydantic for runtime validation, JSON serialization/deserialization, and schema generation. The dependency on Pydantic is deep — it is not a thin wrapper but the foundation of the type system. [d7f3a62](https://github.com/anthropics/anthropic-sdk-python/commit/d7f3a62)
+All API response types are Pydantic v2 `BaseModel` subclasses. The dependency on Pydantic is deep — it is the foundation of the type system, handling runtime validation, JSON serialization/deserialization, and schema generation. [d7f3a62](https://github.com/anthropics/anthropic-sdk-python/commit/d7f3a62)
 
 ```python
 from pydantic import BaseModel, ConfigDict
@@ -46,11 +46,11 @@ class Message(BaseModel):
     usage: Usage
 ```
 
-The `extra="allow"` config is standard across all response models, enabling forward compatibility — when the API adds new fields, existing SDK versions continue to work.
+The `extra="allow"` config is standard across all response models, enabling forward compatibility when the API adds new fields. See [[type-discipline]] for the full BaseModel vs. TypedDict split.
 
 ## Minimal Dependency Surface (Python)
 
-The Python SDK's runtime dependencies are intentionally few: `httpx`, `pydantic`, `typing-extensions`, `distro`, `sniffio`, `anyio`, and `tokenizers` (optional). There are no utility grab-bag dependencies like `requests`, `urllib3`, `click`, or `attrs`. Each dependency serves a specific, non-overlapping purpose. [e1a9b35](https://github.com/anthropics/anthropic-sdk-python/commit/e1a9b35)
+The Python SDK's runtime dependencies are intentionally few. Each serves a specific, non-overlapping purpose. No utility grab-bags like `requests`, `urllib3`, `click`, or `attrs`. [e1a9b35](https://github.com/anthropics/anthropic-sdk-python/commit/e1a9b35)
 
 | Dependency | Purpose |
 |------------|---------|
@@ -62,34 +62,30 @@ The Python SDK's runtime dependencies are intentionally few: `httpx`, `pydantic`
 | distro | OS identification for user-agent string |
 | tokenizers | Optional: client-side token counting |
 
-## node-fetch and TypeScript Ecosystem
+## TypeScript Dependency Footprint
 
-The TypeScript SDK depends on `node-fetch` for HTTP in Node.js environments and uses the native `fetch` in edge runtimes. Dependencies include `@anthropic-ai/sdk` internal packages, `web-streams-polyfill` for streaming in older Node versions, and `abort-controller` for request cancellation. [b8e4a19](https://github.com/anthropics/anthropic-sdk-typescript/commit/b8e4a19)
+The TypeScript SDK depends on `node-fetch` for HTTP in Node.js environments and uses native `fetch` in edge runtimes. Additional dependencies include `web-streams-polyfill` for streaming in older Node versions and `abort-controller` for request cancellation. [b8e4a19](https://github.com/anthropics/anthropic-sdk-typescript/commit/b8e4a19)
 
-The TypeScript dependency footprint is similarly minimal — no Express, no Axios, no lodash. The SDK is designed to work in Node.js, Deno, Bun, and Cloudflare Workers without pulling in environment-specific frameworks.
+The footprint is similarly minimal — no Express, no Axios, no lodash. The SDK works in Node.js, Deno, Bun, and Cloudflare Workers without pulling in environment-specific frameworks.
 
 ## typing-extensions for Backport Support
 
-The Python SDK depends on `typing-extensions` to use modern type constructs on older Python versions. Key imports include `Required` (for TypedDict fields), `override` (decorator signaling method overrides), `Literal`, and `TypeGuard`. This enables writing modern typed code while supporting Python 3.8+. [f4a1c39](https://github.com/anthropics/anthropic-sdk-python/commit/f4a1c39)
-
-```python
-from typing_extensions import Required, override, Literal, TypeGuard
-```
+The Python SDK depends on `typing-extensions` to use modern type constructs on older Python versions. Key imports: `Required` (TypedDict fields), `override` (method override decorator), `Literal`, `TypeGuard`. This enables modern typed code while supporting Python 3.8+. [f4a1c39](https://github.com/anthropics/anthropic-sdk-python/commit/f4a1c39)
 
 ## No Framework Dependencies in Cookbook
 
-Cookbook examples install only the `anthropic` SDK plus whatever third-party integration is being demonstrated (e.g., `langchain`, `llama-index`). There is no shared cookbook framework or utility library. Each recipe's `requirements.txt` is self-contained and minimal. [f2b8c41](https://github.com/anthropics/anthropic-cookbook/commit/f2b8c41)
+Cookbook examples install only the `anthropic` SDK plus whatever third-party integration is being demonstrated (`langchain`, `llama-index`, etc.). No shared cookbook framework or utility library. Each recipe's `requirements.txt` is self-contained. [f2b8c41](https://github.com/anthropics/anthropic-cookbook/commit/f2b8c41)
 
 ```
 # typical cookbook recipe requirements.txt
 anthropic>=0.30.0
 ```
 
-When a recipe demonstrates a third-party integration, that integration's package is the only addition. No kitchen-sink requirements.
+This isolation reinforces the cookbook's pedagogical goal: users see exactly which dependencies a given integration requires, with no hidden shared state.
 
-## Rye/uv for Python Project Management
+## Hatch for Python Build Management
 
-Anthropic's Python repositories use modern Python project management tooling. The SDK uses `pyproject.toml` with Hatch as the build backend. Development dependencies (pytest, mypy, pyright, ruff) are specified in `[project.optional-dependencies]` rather than a separate `requirements-dev.txt`. [b5e7f93](https://github.com/anthropics/anthropic-sdk-python/commit/b5e7f93)
+The SDK uses `pyproject.toml` with Hatch as the build backend. Development dependencies (pytest, mypy, pyright, ruff) are specified in `[project.optional-dependencies]` rather than a separate `requirements-dev.txt`. [b5e7f93](https://github.com/anthropics/anthropic-sdk-python/commit/b5e7f93)
 
 ```toml
 [build-system]
@@ -114,4 +110,8 @@ Runtime dependencies use lower-bound pins with upper-bound major version constra
 
 ## MIT License Across All Repos
 
-Every public Anthropic repository uses the MIT license. There are no GPL dependencies, no copyleft contamination concerns. This is consistent across SDKs, cookbooks, courses, and tools — the entire public surface is permissively licensed. [e5a2c71](https://github.com/anthropics/anthropic-sdk-python/commit/e5a2c71)
+Every public Anthropic repository uses the MIT license. No GPL dependencies, no copyleft concerns. This is consistent across SDKs, cookbooks, courses, and tools. [e5a2c71](https://github.com/anthropics/anthropic-sdk-python/commit/e5a2c71)
+
+## Stainless as an Implicit Dependency
+
+The SDKs have an invisible dependency: the Stainless code generation platform. While Stainless does not appear in `pyproject.toml` or `package.json`, it determines the SDK's structural DNA — the resource architecture, the error hierarchy, the sync/async mirroring, and much of the type scaffolding. Understanding which patterns come from Stainless (shared with OpenAI, Cloudflare, etc.) versus which are Anthropic-specific customizations (streaming convenience methods, tool use helpers, cookbook patterns) is key to reading the codebase accurately. See [[_meta/sources]] for more on this distinction.

@@ -24,7 +24,7 @@ Pipeline configuration used to produce this wiki.
     "dedup_by_diff": true
   },
   "llm": {
-    "model": "claude-sonnet-4-20250514",
+    "model": "claude-opus-4-20250514",
     "temperature": 0.3,
     "max_tokens_per_article": 4096
   },

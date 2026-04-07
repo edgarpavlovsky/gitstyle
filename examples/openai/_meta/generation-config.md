@@ -9,7 +9,7 @@ last_updated: 2026-04-07
 ```yaml
 org: openai
 mode: organization
-model: claude-sonnet-4-20250514
+model: claude-opus-4-20250514
 output_dir: wiki/
 max_commits: 500
 repos:
@@ -31,9 +31,9 @@ sample_size: 30
 
 | Setting | Value |
 |---------|-------|
-| gitstyle version | 0.1.0 |
+| gitstyle version | 0.2.0 |
 | Mode | organization (multi-repo, multi-contributor) |
-| LLM model | claude-sonnet-4-20250514 |
+| LLM model | claude-opus-4-20250514 |
 | Max commits per repo | 500 |
 | Sample size per cluster | 30 |
 | Sample strategy | balanced (recent + largest + random) |
