@@ -18,3 +18,4 @@ venv/
 *.pem
 *.p12
 .env.*
+wiki/
