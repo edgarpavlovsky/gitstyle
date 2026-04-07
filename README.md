@@ -213,6 +213,7 @@ Delete `.gitstyle/` to start fresh, or delete individual cache files to re-run s
 See the `examples/` directory for complete wiki outputs:
 
 - [`examples/edgarpavlovsky/`](examples/edgarpavlovsky/) — The author's engineering style wiki
+- [`examples/torvalds/`](examples/torvalds/) — Linus Torvalds' kernel C style
 
 ## Development
 
