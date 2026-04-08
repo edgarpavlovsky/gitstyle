@@ -858,6 +858,110 @@ class TestEvolveWikiNoNewObservations:
             assert result[0].content == "Content A"
 
 
+class TestEvolveWikiContradiction:
+    """Tests that evolve_wiki handles contradictions correctly — confidence should lower."""
+
+    def test_contradiction_lowers_confidence(self):
+        """When LLM evolves an article with contradictions, confidence should decrease."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_dir = Path(tmpdir)
+            config = _make_config(cache_dir)
+            config.ensure_cache_dir()
+
+            existing_articles = [
+                _make_article(
+                    slug="code-structure",
+                    content="The developer always uses monolithic single-file designs.",
+                    confidence=0.9,
+                ),
+            ]
+
+            # New observations that contradict the existing claim
+            contradicting_extractions = [_make_extraction(observations=[
+                _make_observation(
+                    dimension=StyleDimension.CODE_STRUCTURE,
+                    claim="Recent commits show modular multi-file architecture",
+                    evidence=["new_sha1", "new_sha2"],
+                    confidence=0.85,
+                ),
+            ])]
+
+            # Mock LLM to return lowered confidence (simulating correct behavior)
+            evolved_response = {
+                "title": "Code Structure",
+                "content": "Initially the developer used monolithic single-file designs, "
+                           "but recent commits suggest a shift toward modular multi-file "
+                           "architecture [new_sha1] [new_sha2].",
+                "confidence": 0.6,  # Lowered from 0.9 due to contradiction
+                "wikilinks": [],
+                "changes_summary": "Noted contradiction: shift from monolithic to modular",
+            }
+
+            with patch("gitstyle.compile.LLMClient") as MockLLM:
+                mock_instance = MockLLM.return_value
+                mock_instance.complete_json.return_value = evolved_response
+                result = evolve_wiki(existing_articles, contradicting_extractions, config)
+
+            # Verify the evolved article has lower confidence than the original
+            evolved = [a for a in result if a.slug == "code-structure"][0]
+            assert evolved.confidence < 0.9, (
+                f"Confidence should decrease on contradiction: was 0.9, got {evolved.confidence}"
+            )
+            assert evolved.confidence == 0.6
+
+    def test_reinforcement_raises_confidence(self):
+        """When new observations reinforce existing claims, confidence should increase."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_dir = Path(tmpdir)
+            config = _make_config(cache_dir)
+            config.ensure_cache_dir()
+
+            existing_articles = [
+                _make_article(
+                    slug="naming-conventions",
+                    title="Naming Conventions",
+                    content="The developer consistently uses snake_case.",
+                    confidence=0.7,
+                ),
+            ]
+
+            reinforcing_extractions = [_make_extraction(observations=[
+                _make_observation(
+                    dimension=StyleDimension.NAMING,
+                    claim="Uses snake_case consistently across all new modules",
+                    evidence=["reinforce_sha1"],
+                    confidence=0.9,
+                ),
+            ])]
+
+            evolved_response = {
+                "title": "Naming Conventions",
+                "content": "The developer consistently uses snake_case across all modules, "
+                           "confirmed by recent commits [reinforce_sha1].",
+                "confidence": 0.9,  # Raised from 0.7 due to reinforcement
+                "wikilinks": [],
+                "changes_summary": "Strengthened snake_case claim with new evidence",
+            }
+
+            with patch("gitstyle.compile.LLMClient") as MockLLM:
+                mock_instance = MockLLM.return_value
+                mock_instance.complete_json.return_value = evolved_response
+                result = evolve_wiki(existing_articles, reinforcing_extractions, config)
+
+            evolved = [a for a in result if a.slug == "naming-conventions"][0]
+            assert evolved.confidence > 0.7, (
+                f"Confidence should increase on reinforcement: was 0.7, got {evolved.confidence}"
+            )
+            assert evolved.confidence == 0.9
+
+    def test_evolve_prompt_contains_contradiction_instruction(self):
+        """The evolve prompt explicitly instructs the LLM to lower confidence on contradictions."""
+        from gitstyle.compile import EVOLVE_SYSTEM
+        assert "LOWER" in EVOLVE_SYSTEM
+        assert "contradict" in EVOLVE_SYSTEM.lower()
+        assert "confidence" in EVOLVE_SYSTEM.lower()
+
+
 class TestMergeExtractionsEmpty:
     def test_merge_both_empty(self):
         result = merge_extractions([], [])

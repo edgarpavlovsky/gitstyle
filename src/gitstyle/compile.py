@@ -69,7 +69,8 @@ from recent commits. Your job is to EVOLVE the article:
 - Preserve insights from the existing article that remain valid
 - Incorporate new observations naturally into the existing text
 - If new observations contradict existing claims, note the evolution \
-("Initially X, but recent commits suggest Y")
+("Initially X, but recent commits suggest Y") and LOWER the confidence score \
+to reflect the uncertainty — contradicted claims should not remain at high confidence
 - If new observations reinforce existing claims, strengthen the evidence and \
 increase confidence
 - Add new sections if the observations reveal genuinely new patterns
@@ -92,8 +93,8 @@ You are updating a language-specific engineering style article with new informat
 from recent commits.
 
 You have an existing article and new observations. Evolve the article — preserve \
-what's valid, incorporate new patterns, note contradictions, strengthen confirmed \
-patterns. Cite new commit SHAs inline.
+what's valid, incorporate new patterns, note contradictions and LOWER confidence \
+when they occur, strengthen confirmed patterns. Cite new commit SHAs inline.
 
 Return valid JSON:
 {
