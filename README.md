@@ -118,10 +118,10 @@ gitstyle includes a built-in web viewer with an interactive knowledge graph:
 gitstyle serve
 
 # Serve a specific wiki directory
-gitstyle serve examples/karpathy
+gitstyle serve -w examples/karpathy
 
 # Custom port, no auto-open
-gitstyle serve wiki/ --port 3000 --no-open
+gitstyle serve -w wiki/ --port 3000 --no-open
 ```
 
 The viewer has two modes:
@@ -200,7 +200,7 @@ gitstyle run <username> [options]
 gitstyle fetch <username>
 
 # Launch web viewer with interactive graph
-gitstyle serve [wiki_dir]
+gitstyle serve [-w wiki_dir]
 
 # Show version
 gitstyle version
@@ -223,6 +223,7 @@ gitstyle version
 | `--exclude-repos` | — | Comma-separated repos to exclude |
 | `--strategy` | `balanced` | Sampling: balanced, recent, largest |
 | `--skip-lint` | `false` | Skip lint stage |
+| `--wiki-dir, -w` | `wiki/` | Wiki directory to serve (`serve`) |
 | `--port, -p` | `8080` | Port for `serve` command |
 | `--no-open` | `false` | Don't auto-open browser (`serve`) |
 

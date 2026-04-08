@@ -39,11 +39,16 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
             current_key = key
             current_list = []
         else:
-            # Try numeric
-            try:
-                meta[key] = float(val) if "." in val else int(val)
-            except ValueError:
-                meta[key] = val
+            # Handle inline YAML lists: [item1, item2]
+            if val.startswith("[") and val.endswith("]"):
+                items = [v.strip() for v in val[1:-1].split(",") if v.strip()]
+                meta[key] = items
+            else:
+                # Try numeric
+                try:
+                    meta[key] = float(val) if "." in val else int(val)
+                except ValueError:
+                    meta[key] = val
     if current_key and current_list is not None:
         meta[current_key] = current_list
     body = text[end + 3:].strip()

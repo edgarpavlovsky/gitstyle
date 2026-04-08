@@ -115,13 +115,16 @@ a:hover{text-decoration:underline}
 </div>
 
 <script>
-// CDN dependency loader
+// CDN dependency loader — versions are pinned intentionally.
+// marked is pinned to v4.x because v5+ removed the `highlight` option from
+// marked.parse(), which silently breaks code-block rendering. Do not bump
+// marked past 4.x without verifying highlight.js integration still works.
 const DEPS = [
-  { url: 'https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js', global: 'd3' },
-  { url: 'https://cdn.jsdelivr.net/npm/marked/marked.min.js', global: 'marked' },
-  { url: 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js', global: 'hljs' },
+  { url: 'https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js', global: 'd3' },
+  { url: 'https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js', global: 'marked' },
+  { url: 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js', global: 'hljs' },
 ];
-const HLJS_CSS = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css';
+const HLJS_CSS = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css';
 
 let cdnReady = false;
 
@@ -177,7 +180,9 @@ function renderSidebar() {
   const groups = { index: [], dimension: [], language: [], meta: [] };
   files.forEach(f => {
     const cat = f.meta.category || 'meta';
-    (groups[cat] || groups.meta).push(f);
+    // Normalize: 'style' → 'dimension'
+    const key = cat === 'style' ? 'dimension' : cat;
+    (groups[key] || groups.meta).push(f);
   });
 
   let html = '';
@@ -219,7 +224,7 @@ function showGraph() {
   currentFile = null;
   updateTabs();
   renderSidebar();
-  document.getElementById('graph-view').style.display = '';
+  document.getElementById('graph-view').style.display = 'block';
   document.getElementById('article-view').style.display = 'none';
   document.getElementById('breadcrumb').textContent = '';
 }
@@ -229,78 +234,79 @@ function updateTabs() {
     t.classList.toggle('active', t.dataset.view === currentView);
   });
   if (currentView === 'graph') {
-    document.getElementById('graph-view').style.display = '';
+    document.getElementById('graph-view').style.display = 'block';
     document.getElementById('article-view').style.display = 'none';
   } else {
     document.getElementById('graph-view').style.display = 'none';
-    document.getElementById('article-view').style.display = '';
+    document.getElementById('article-view').style.display = 'block';
   }
 }
 
 // Article renderer
 async function renderArticle(path) {
-  const data = await apiFetch(`/api/file/${path}`);
-  const meta = data.meta || {};
-  const body = data.body || '';
-
-  let confidence = meta.confidence;
-  let badgeClass = 'badge-medium';
-  if (confidence >= 0.8) badgeClass = 'badge-high';
-  else if (confidence < 0.5) badgeClass = 'badge-low';
-
-  let metaHtml = `<div class="article-meta">`;
-  metaHtml += `<h1>${meta.title || path}</h1>`;
-  if (meta.category) metaHtml += `<span class="badge badge-category">${meta.category}</span>`;
-  if (confidence !== undefined) metaHtml += `<span class="badge ${badgeClass}">${(confidence * 100).toFixed(0)}% confidence</span>`;
-  if (meta.source_repos && meta.source_repos.length > 0) {
-    metaHtml += `<div class="meta-row">Sources: ${meta.source_repos.join(', ')}</div>`;
-  }
-  if (meta.last_updated) {
-    metaHtml += `<div class="meta-row">Updated: ${meta.last_updated}</div>`;
-  }
-  metaHtml += `</div>`;
-
-  // Render markdown
-  const rendered = marked.parse(body, {
-    gfm: true,
-    breaks: false,
-    highlight: (code, lang) => {
-      if (lang && hljs.getLanguage(lang)) {
-        return hljs.highlight(code, { language: lang }).value;
-      }
-      return hljs.highlightAuto(code).value;
-    },
-  });
-
-  // Replace wikilinks with clickable links
-  const withLinks = rendered.replace(/\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g, (m, target, label) => {
-    const display = label || target;
-    return `<a href="#" class="wikilink" data-target="${target}">${display}</a>`;
-  });
-
   const el = document.getElementById('article-view');
-  el.innerHTML = metaHtml + `<div class="md-body">${withLinks}</div>`;
-  el.scrollTop = 0;
+  try {
+    const data = await apiFetch(`/api/file/${path}`);
+    if (data.error) { el.innerHTML = `<p style="color:var(--fg2);padding:24px">Article not found: ${path}</p>`; return; }
+    const meta = data.meta || {};
+    const body = data.body || '';
 
-  // Highlight code blocks
-  el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+    let confidence = meta.confidence;
+    let badgeClass = 'badge-medium';
+    if (typeof confidence === 'string') {
+      confidence = confidence === 'high' ? 0.9 : confidence === 'medium' ? 0.7 : 0.4;
+    }
+    if (confidence >= 0.8) badgeClass = 'badge-high';
+    else if (confidence < 0.5) badgeClass = 'badge-low';
 
-  // Wire wikilinks
-  el.querySelectorAll('.wikilink').forEach(a => {
-    a.addEventListener('click', e => {
-      e.preventDefault();
-      const target = a.dataset.target;
-      // Find matching file
-      const match = files.find(f =>
-        f.slug === target ||
-        f.path === target + '.md' ||
-        f.path === target
-      );
-      if (match) navigateTo(match.path);
+    let metaHtml = `<div class="article-meta">`;
+    metaHtml += `<h1>${meta.title || path}</h1>`;
+    if (meta.category) metaHtml += `<span class="badge badge-category">${meta.category}</span>`;
+    if (confidence !== undefined) metaHtml += `<span class="badge ${badgeClass}">${typeof confidence === 'number' ? (confidence * 100).toFixed(0) + '% confidence' : confidence}</span>`;
+    if (meta.sources && meta.sources.length > 0) {
+      metaHtml += `<div class="meta-row">Sources: ${Array.isArray(meta.sources) ? meta.sources.join(', ') : meta.sources}</div>`;
+    } else if (meta.source_repos && meta.source_repos.length > 0) {
+      metaHtml += `<div class="meta-row">Sources: ${meta.source_repos.join(', ')}</div>`;
+    }
+    if (meta.last_updated) {
+      metaHtml += `<div class="meta-row">Updated: ${meta.last_updated}</div>`;
+    }
+    metaHtml += `</div>`;
+
+    // Render markdown
+    const rendered = marked.parse(body, { gfm: true, breaks: false });
+
+    // Replace wikilinks with clickable links
+    const withLinks = rendered.replace(/\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g, (m, target, label) => {
+      const display = label || target;
+      return `<a href="#" class="wikilink" data-target="${target}">${display}</a>`;
     });
-  });
 
-  document.getElementById('breadcrumb').textContent = meta.title || path;
+    el.innerHTML = metaHtml + `<div class="md-body">${withLinks}</div>`;
+    el.scrollTop = 0;
+
+    // Highlight code blocks
+    el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+
+    // Wire wikilinks
+    el.querySelectorAll('.wikilink').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = a.dataset.target;
+        const match = files.find(f =>
+          f.slug === target ||
+          f.path === target + '.md' ||
+          f.path === target
+        );
+        if (match) navigateTo(match.path);
+      });
+    });
+
+    document.getElementById('breadcrumb').textContent = meta.title || path;
+  } catch (err) {
+    console.error('renderArticle error:', err);
+    el.innerHTML = `<p style="color:var(--fg2);padding:24px">Error loading article. Check console for details.</p>`;
+  }
 }
 
 // Graph
