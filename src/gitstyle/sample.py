@@ -46,6 +46,10 @@ def sample(commits: list[RawCommit], config: GitStyleConfig) -> list[SampledClus
             total_in_group=total,
         ))
 
+    if not clusters:
+        console.print("[yellow]  Warning: 0 clusters sampled (not caching empty result)[/yellow]")
+        return clusters
+
     # Cache
     with open(cache, "w") as f:
         json.dump([c.model_dump(mode="json") for c in clusters], f, indent=2, default=str)

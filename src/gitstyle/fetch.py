@@ -56,6 +56,10 @@ def fetch(config: GitStyleConfig) -> list[RawCommit]:
                     all_commits = all_commits[: config.max_commits]
                     break
 
+    if not all_commits:
+        console.print("[yellow]  Warning: 0 commits fetched (not caching empty result)[/yellow]")
+        return all_commits
+
     # Write JSONL cache
     with open(cache, "w") as f:
         for c in all_commits:

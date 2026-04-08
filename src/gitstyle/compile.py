@@ -137,6 +137,10 @@ def compile_wiki(
         except Exception as e:
             console.print(f"[red]  Error compiling {lang}: {e}[/red]")
 
+    if not articles:
+        console.print("[yellow]  Warning: 0 articles compiled (not caching empty result)[/yellow]")
+        return articles
+
     # Cache
     with open(cache, "w") as f:
         json.dump([a.model_dump(mode="json") for a in articles], f, indent=2)

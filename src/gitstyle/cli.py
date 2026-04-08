@@ -73,6 +73,19 @@ def run(
         dry_run=dry_run,
     )
 
+    # Validate GitHub token early
+    from gitstyle.github_client import GitHubClient
+    try:
+        with GitHubClient(github_token) as gh:
+            resp = gh._request("GET", "/user")
+            console.print(f"[dim]GitHub auth: {resp.json().get('login', 'ok')}[/dim]")
+    except Exception as e:
+        console.print(
+            f"[red]Error: GitHub token is invalid or expired.[/red]\n"
+            f"[dim]{e}[/dim]"
+        )
+        raise typer.Exit(1)
+
     # Validate LLM credentials early (before fetching anything)
     if not dry_run:
         from gitstyle.llm_client import LLMClient
@@ -255,18 +268,39 @@ def _run_pipeline(config: GitStyleConfig) -> None:
     # Stage 1: Fetch
     console.rule("[bold blue]Stage 1: Fetch")
     commits = fetch(config)
+    if not commits:
+        console.print(
+            "[red]Error: No commits found.[/red]\n"
+            "[dim]Check that the username is correct and has public repos with commits.\n"
+            "If you previously ran this command and it failed, try: gitstyle clean[/dim]"
+        )
+        return
 
     # Stage 2: Sample
     console.rule("[bold blue]Stage 2: Sample")
     clusters = sample(commits, config)
+    if not clusters:
+        console.print("[red]Error: No commit clusters to analyze.[/red]")
+        return
 
     # Stage 3: Extract
     console.rule("[bold blue]Stage 3: Extract")
     extractions = extract(clusters, config)
+    total_obs = sum(len(e.observations) for e in extractions)
+    if total_obs == 0 and not config.dry_run:
+        console.print(
+            "[red]Error: LLM extraction produced 0 observations.[/red]\n"
+            "[dim]This usually means your API key is invalid or the model returned errors.\n"
+            "Check the error messages above and try: gitstyle clean[/dim]"
+        )
+        return
 
     # Stage 4: Compile
     console.rule("[bold blue]Stage 4: Compile")
     articles = compile_wiki(extractions, config)
+    if not articles and not config.dry_run:
+        console.print("[red]Error: No articles compiled.[/red]")
+        return
 
     # Stage 5: Lint
     console.rule("[bold blue]Stage 5: Lint")

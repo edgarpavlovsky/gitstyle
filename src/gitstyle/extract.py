@@ -95,11 +95,15 @@ def extract(
             ))
             progress.advance(task)
 
+    total_obs = sum(len(e.observations) for e in extractions)
+    if total_obs == 0:
+        console.print("[yellow]  Warning: 0 observations extracted (not caching empty result)[/yellow]")
+        return extractions
+
     # Cache
     with open(cache, "w") as f:
         json.dump([e.model_dump(mode="json") for e in extractions], f, indent=2)
 
-    total_obs = sum(len(e.observations) for e in extractions)
     console.print(f"  Extracted [green]{total_obs}[/green] observations")
     return extractions
 
