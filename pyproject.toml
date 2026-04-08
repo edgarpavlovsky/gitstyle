@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gitstyle"
-version = "0.3.0"
+version = "0.3.1"
 description = "Analyze a developer's GitHub commit history and compile it into a personal engineering style wiki."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 authors = [{ name = "Edgar Pavlovsky" }]
 keywords = ["github", "engineering", "style", "wiki", "cli"]
 classifiers = [
