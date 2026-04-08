@@ -41,14 +41,19 @@ class LLMClient:
         max_tokens: int = 8192,
         temperature: float = 0.3,
     ) -> str:
-        """Send a prompt and return the text response."""
-        message = self._client.messages.create(
+        """Send a prompt and return the text response.
+
+        Uses streaming to avoid timeout errors with large models (e.g. Opus)
+        where requests may exceed 10 minutes.
+        """
+        with self._client.messages.stream(
             model=self.model,
             max_tokens=max_tokens,
             temperature=temperature,
             system=system,
             messages=[{"role": "user", "content": prompt}],
-        )
+        ) as stream:
+            message = stream.get_final_message()
         return message.content[0].text
 
     def complete_json(
