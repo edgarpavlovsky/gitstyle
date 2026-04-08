@@ -67,6 +67,7 @@ def _write_article(path: Path, article: WikiArticle) -> None:
     fm_lines.append("---")
     fm_lines.append("")
 
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         f.write("\n".join(fm_lines))
         f.write(article.content)

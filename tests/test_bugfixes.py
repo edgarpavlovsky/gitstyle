@@ -22,7 +22,13 @@ from unittest.mock import MagicMock, patch, PropertyMock
 import anthropic
 import pytest
 
-from gitstyle.compile import _fix_wikilinks, _build_dimension_prompt, _build_language_prompt
+from gitstyle.compile import (
+    _fix_wikilinks,
+    _build_dimension_prompt,
+    _build_language_prompt,
+    _normalize_language,
+    _slugify_language,
+)
 from gitstyle.config import GitStyleConfig
 from gitstyle.llm_client import LLMClient
 from gitstyle.models import (
@@ -872,3 +878,118 @@ class TestTransientAPIRetry:
         client.complete("system", "prompt")
         delays = [call.args[0] for call in mock_sleep.call_args_list]
         assert delays == [2.0, 4.0, 8.0]
+
+
+# ---------------------------------------------------------------------------
+# Language normalization and slug sanitization
+# ---------------------------------------------------------------------------
+
+class TestLanguageNormalization:
+    def test_normalize_case_variants(self):
+        """Python/python/PYTHON should all normalize to 'Python'."""
+        assert _normalize_language("Python") == "Python"
+        assert _normalize_language("python") == "Python"
+        assert _normalize_language("PYTHON") == "Python"
+
+    def test_normalize_cuda_variants(self):
+        """CUDA/Cuda/cuda should all normalize to 'CUDA'."""
+        assert _normalize_language("CUDA") == "CUDA"
+        assert _normalize_language("Cuda") == "CUDA"
+        assert _normalize_language("cuda") == "CUDA"
+
+    def test_normalize_m_to_matlab(self):
+        """'M' should normalize to 'MATLAB'."""
+        assert _normalize_language("M") == "MATLAB"
+        assert _normalize_language("m") == "MATLAB"
+
+    def test_normalize_html_css_slash(self):
+        """'html/css' should become 'HTML-CSS' (no filesystem slash)."""
+        assert _normalize_language("html/css") == "HTML-CSS"
+
+    def test_normalize_markdown_variants(self):
+        assert _normalize_language("markdown") == "Markdown"
+        assert _normalize_language("Markdown") == "Markdown"
+
+    def test_normalize_unknown_language_preserved(self):
+        """Unknown languages should be returned as-is."""
+        assert _normalize_language("Haskell") == "Haskell"
+        assert _normalize_language("Zig") == "Zig"
+
+    def test_normalize_strips_whitespace(self):
+        assert _normalize_language("  Python  ") == "Python"
+
+
+class TestSlugifyLanguage:
+    def test_basic_slug(self):
+        assert _slugify_language("Python") == "python"
+
+    def test_slug_replaces_slash(self):
+        """Slashes must be replaced to avoid filesystem path issues."""
+        assert _slugify_language("HTML-CSS") == "html-css"
+        assert _slugify_language("html/css") == "html-css"
+
+    def test_slug_replaces_space(self):
+        assert _slugify_language("Jupyter Notebook") == "jupyter-notebook"
+
+    def test_slug_sharp_and_plus(self):
+        assert _slugify_language("C#") == "csharp"
+        assert _slugify_language("C++") == "cplusplus"
+
+    def test_slug_already_clean(self):
+        assert _slugify_language("rust") == "rust"
+
+
+class TestLanguageDeduplication:
+    """Verify that _group_observations merges language variants."""
+
+    def test_python_variants_merge(self):
+        from gitstyle.compile import _group_observations
+        from gitstyle.models import ClusterExtraction
+
+        ext = ClusterExtraction(
+            repo="user/repo",
+            language="mixed",
+            observations=[
+                _make_observation(dim=StyleDimension.LANGUAGE_IDIOMS, language="Python"),
+                _make_observation(dim=StyleDimension.LANGUAGE_IDIOMS, language="python"),
+            ],
+        )
+        _, by_language, _ = _group_observations([ext])
+        # Both should be merged under "Python"
+        assert "Python" in by_language
+        assert "python" not in by_language
+        assert len(by_language["Python"]) == 2
+
+    def test_cuda_variants_merge(self):
+        from gitstyle.compile import _group_observations
+        from gitstyle.models import ClusterExtraction
+
+        ext = ClusterExtraction(
+            repo="user/repo",
+            language="mixed",
+            observations=[
+                _make_observation(dim=StyleDimension.LANGUAGE_IDIOMS, language="CUDA"),
+                _make_observation(dim=StyleDimension.LANGUAGE_IDIOMS, language="Cuda"),
+            ],
+        )
+        _, by_language, _ = _group_observations([ext])
+        assert "CUDA" in by_language
+        assert "Cuda" not in by_language
+        assert len(by_language["CUDA"]) == 2
+
+    def test_m_merges_into_matlab(self):
+        from gitstyle.compile import _group_observations
+        from gitstyle.models import ClusterExtraction
+
+        ext = ClusterExtraction(
+            repo="user/repo",
+            language="mixed",
+            observations=[
+                _make_observation(dim=StyleDimension.LANGUAGE_IDIOMS, language="M"),
+                _make_observation(dim=StyleDimension.LANGUAGE_IDIOMS, language="MATLAB"),
+            ],
+        )
+        _, by_language, _ = _group_observations([ext])
+        assert "MATLAB" in by_language
+        assert "M" not in by_language
+        assert len(by_language["MATLAB"]) == 2

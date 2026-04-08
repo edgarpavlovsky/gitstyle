@@ -140,7 +140,7 @@ def compile_wiki(
     # Pre-compute valid slugs so the LLM knows what wikilinks are available
     valid_slugs = [dim.value for dim in StyleDimension if by_dimension.get(dim)]
     for lang in sorted(by_language.keys()):
-        valid_slugs.append(lang.lower().replace(" ", "-").replace("#", "sharp").replace("+", "plus"))
+        valid_slugs.append(_slugify_language(lang))
 
     # Compile dimension articles
     for dim in StyleDimension:
@@ -167,7 +167,7 @@ def compile_wiki(
     for lang, obs_list in sorted(by_language.items()):
         if not obs_list:
             continue
-        slug = lang.lower().replace(" ", "-").replace("#", "sharp").replace("+", "plus")
+        slug = _slugify_language(lang)
         console.print(f"  Compiling language: [cyan]{lang}[/cyan]...")
         prompt = _build_language_prompt(lang, obs_list, valid_slugs=valid_slugs)
         try:
@@ -230,7 +230,7 @@ def evolve_wiki(
             else:
                 create_count += 1
     for lang in by_language:
-        slug = lang.lower().replace(" ", "-").replace("#", "sharp").replace("+", "plus")
+        slug = _slugify_language(lang)
         if slug in existing_by_slug:
             evolve_count += 1
         else:
@@ -289,7 +289,7 @@ def evolve_wiki(
 
     # Evolve/create language articles
     for lang, new_obs in sorted(by_language.items()):
-        slug = lang.lower().replace(" ", "-").replace("#", "sharp").replace("+", "plus")
+        slug = _slugify_language(lang)
         existing_article = existing_by_slug.get(slug)
 
         if existing_article and new_obs:
@@ -422,6 +422,54 @@ def _build_evolve_prompt(
     return "\n".join(lines)
 
 
+def _slugify_language(lang: str) -> str:
+    """Convert a language name to a filesystem-safe slug."""
+    return (
+        lang.lower()
+        .replace("/", "-")
+        .replace(" ", "-")
+        .replace("#", "sharp")
+        .replace("+", "plus")
+    )
+
+
+def _normalize_language(lang: str) -> str:
+    """Normalize language names to canonical forms.
+
+    Merges case variants (Python/python), combined names (html/css → HTML-CSS),
+    and common aliases (M → MATLAB).
+    """
+    # Strip whitespace
+    lang = lang.strip()
+
+    # Replace filesystem-unsafe characters
+    lang = lang.replace("/", "-")
+
+    # Known aliases / merges
+    aliases = {
+        "m": "MATLAB",
+        "cuda": "CUDA",
+        "c++": "C++",
+        "c#": "C#",
+        "javascript": "JavaScript",
+        "typescript": "TypeScript",
+        "jupyter notebook": "Jupyter Notebook",
+        "html": "HTML",
+        "css": "CSS",
+        "html-css": "HTML-CSS",
+        "shell": "Shell",
+        "makefile": "Makefile",
+        "markdown": "Markdown",
+        "mdx": "MDX",
+        "python": "Python",
+        "go": "Go",
+        "rust": "Rust",
+        "lua": "Lua",
+        "swift": "Swift",
+    }
+    return aliases.get(lang.lower(), lang)
+
+
 def _group_observations(
     extractions: list[ClusterExtraction],
 ) -> tuple[
@@ -439,7 +487,8 @@ def _group_observations(
         for obs in ext.observations:
             by_dimension[obs.dimension].append(obs)
             if obs.language and obs.dimension == StyleDimension.LANGUAGE_IDIOMS:
-                by_language[obs.language].append(obs)
+                normalized = _normalize_language(obs.language)
+                by_language[normalized].append(obs)
 
     return by_dimension, by_language, all_repos
 
