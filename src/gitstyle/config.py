@@ -14,6 +14,7 @@ class GitStyleConfig(BaseModel):
     output_dir: Path = Path("wiki")
     cache_dir: Path = Path(".gitstyle")
     max_commits: int = 2000
+    max_repos: int = 30  # For orgs: limit repos (sorted by stars). 0 = no limit.
     samples_per_group: int = 20
     repos: Optional[list[str]] = None  # None = all public repos
     since: Optional[str] = None  # ISO date string
@@ -21,6 +22,7 @@ class GitStyleConfig(BaseModel):
     llm_model: str = "claude-sonnet-4-20250514"
     dry_run: bool = False
     fresh: bool = False  # --fresh forces a full re-run, ignoring cache
+    context_type: Optional[str] = None  # "User" or "Organization" — auto-detected
 
     def commits_path(self) -> Path:
         return self.cache_dir / "commits.jsonl"

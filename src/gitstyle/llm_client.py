@@ -55,17 +55,37 @@ class LLMClient:
         self,
         system: str,
         prompt: str,
-        max_tokens: int = 8192,
+        max_tokens: int = 16384,
         temperature: float = 0.2,
+        retries: int = 1,
     ) -> dict | list:
-        """Send a prompt and parse the response as JSON."""
-        text = self.complete(system, prompt, max_tokens, temperature)
-        # Extract JSON from markdown code blocks if present
+        """Send a prompt and parse the response as JSON. Retries on parse failure."""
+        last_error = None
+        for attempt in range(retries + 1):
+            text = self.complete(system, prompt, max_tokens, temperature)
+            extracted = self._extract_json_text(text)
+            try:
+                return json.loads(extracted)
+            except json.JSONDecodeError as e:
+                last_error = e
+                if attempt < retries:
+                    # Retry: ask the LLM to fix its own output
+                    prompt = (
+                        f"Your previous response was not valid JSON (error: {e}).\n"
+                        f"Here is what you returned:\n```\n{text[:2000]}\n```\n\n"
+                        f"Please return ONLY valid JSON matching the schema in your instructions. "
+                        f"Original request:\n\n{prompt}"
+                    )
+        raise last_error  # type: ignore[misc]
+
+    @staticmethod
+    def _extract_json_text(text: str) -> str:
+        """Extract JSON from markdown code blocks or raw text."""
         if "```json" in text:
             text = text.split("```json", 1)[1].split("```", 1)[0]
         elif "```" in text:
             text = text.split("```", 1)[1].split("```", 1)[0]
-        return json.loads(text.strip())
+        return text.strip()
 
     def estimate_tokens(self, text: str) -> int:
         """Rough token estimate (~4 chars per token)."""

@@ -99,8 +99,24 @@ def _fetch_from_github(
     since = since_override or config.since
 
     with GitHubClient(config.github_token) as gh:
-        repos = gh.list_repos(config.username, config.repos)
+        # Auto-detect user vs org
+        if config.context_type is None:
+            config.context_type = gh.detect_account_type(config.username)
+
+        is_org = config.context_type == "Organization"
+        if is_org:
+            console.print(f"  [dim]Detected organization account[/dim]")
+
+        repos = gh.list_repos(
+            config.username,
+            config.repos,
+            is_org=is_org,
+            max_repos=config.max_repos if is_org else 0,
+        )
         console.print(f"  Found [green]{len(repos)}[/green] repos")
+
+        # For orgs, don't filter by author — fetch all commits
+        author = None if is_org else config.username
 
         all_commits: list[RawCommit] = []
         with Progress(
@@ -114,7 +130,7 @@ def _fetch_from_github(
                 languages = gh.get_repo_languages(repo)
                 commits = gh.fetch_commits_for_repo(
                     repo=repo,
-                    author=config.username,
+                    author=author,
                     languages=languages,
                     since=since,
                     until=config.until,

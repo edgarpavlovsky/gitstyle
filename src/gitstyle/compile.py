@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -132,13 +133,18 @@ def compile_wiki(
     articles: list[WikiArticle] = []
     repos_list = sorted(all_repos)
 
+    # Pre-compute valid slugs so the LLM knows what wikilinks are available
+    valid_slugs = [dim.value for dim in StyleDimension if by_dimension.get(dim)]
+    for lang in sorted(by_language.keys()):
+        valid_slugs.append(lang.lower().replace(" ", "-").replace("#", "sharp").replace("+", "plus"))
+
     # Compile dimension articles
     for dim in StyleDimension:
         obs_list = by_dimension.get(dim, [])
         if not obs_list:
             continue
         console.print(f"  Compiling [cyan]{dim.value}[/cyan]...")
-        prompt = _build_dimension_prompt(dim, obs_list)
+        prompt = _build_dimension_prompt(dim, obs_list, valid_slugs=valid_slugs)
         try:
             data = llm.complete_json(COMPILE_SYSTEM, prompt)
             articles.append(WikiArticle(
@@ -159,7 +165,7 @@ def compile_wiki(
             continue
         slug = lang.lower().replace(" ", "-").replace("#", "sharp").replace("+", "plus")
         console.print(f"  Compiling language: [cyan]{lang}[/cyan]...")
-        prompt = _build_language_prompt(lang, obs_list)
+        prompt = _build_language_prompt(lang, obs_list, valid_slugs=valid_slugs)
         try:
             data = llm.complete_json(LANGUAGE_COMPILE_SYSTEM, prompt)
             articles.append(WikiArticle(
@@ -177,6 +183,9 @@ def compile_wiki(
     if not articles:
         console.print("[yellow]  Warning: 0 articles compiled (not caching empty result)[/yellow]")
         return articles
+
+    # Post-process: strip broken wikilinks
+    articles = _fix_wikilinks(articles)
 
     # Cache
     with open(cache, "w") as f:
@@ -320,6 +329,9 @@ def evolve_wiki(
         for c in changes:
             console.print(f"    {c}")
 
+    # Post-process: strip broken wikilinks
+    evolved_articles = _fix_wikilinks(evolved_articles)
+
     # Update the articles cache
     cache = config.articles_path()
     with open(cache, "w") as f:
@@ -428,13 +440,21 @@ def _group_observations(
     return by_dimension, by_language, all_repos
 
 
-def _build_dimension_prompt(dim: StyleDimension, observations: list[Observation]) -> str:
+def _build_dimension_prompt(
+    dim: StyleDimension,
+    observations: list[Observation],
+    valid_slugs: list[str] | None = None,
+) -> str:
     lines = [
         f"Dimension: {dim.value}",
         f"Total observations: {len(observations)}",
         "",
-        "Observations:",
     ]
+    if valid_slugs:
+        lines.append(f"IMPORTANT: Only use wikilinks from this list: {', '.join(valid_slugs)}")
+        lines.append("Do NOT invent wikilinks to articles that aren't in this list.")
+        lines.append("")
+    lines.append("Observations:")
     for i, obs in enumerate(observations, 1):
         lines.append(f"\n{i}. [{obs.confidence:.0%} confidence]")
         lines.append(f"   Claim: {obs.claim}")
@@ -444,18 +464,43 @@ def _build_dimension_prompt(dim: StyleDimension, observations: list[Observation]
     return "\n".join(lines)
 
 
-def _build_language_prompt(language: str, observations: list[Observation]) -> str:
+def _build_language_prompt(
+    language: str,
+    observations: list[Observation],
+    valid_slugs: list[str] | None = None,
+) -> str:
     lines = [
         f"Language: {language}",
         f"Total observations: {len(observations)}",
         "",
-        "Observations:",
     ]
+    if valid_slugs:
+        lines.append(f"IMPORTANT: Only use wikilinks from this list: {', '.join(valid_slugs)}")
+        lines.append("Do NOT invent wikilinks to articles that aren't in this list.")
+        lines.append("")
+    lines.append("Observations:")
     for i, obs in enumerate(observations, 1):
         lines.append(f"\n{i}. [{obs.confidence:.0%} confidence] ({obs.dimension.value})")
         lines.append(f"   Claim: {obs.claim}")
         lines.append(f"   Evidence: {', '.join(obs.evidence)}")
     return "\n".join(lines)
+
+
+def _fix_wikilinks(articles: list[WikiArticle]) -> list[WikiArticle]:
+    """Post-process: strip wikilinks that point to non-existent articles."""
+    valid_slugs = {a.slug for a in articles}
+    for article in articles:
+        # Fix wikilinks list
+        article.wikilinks = [w for w in article.wikilinks if w in valid_slugs]
+        # Fix [[wikilinks]] in content — replace broken ones with plain text
+        def _replace_link(m: re.Match) -> str:
+            slug = m.group(1)
+            if slug in valid_slugs:
+                return m.group(0)  # keep valid link
+            # Strip brackets, keep the display text
+            return slug.replace("-", " ")
+        article.content = re.sub(r'\[\[([^\]]+)\]\]', _replace_link, article.content)
+    return articles
 
 
 def _load_articles(path: Path) -> list[WikiArticle]:
