@@ -9,7 +9,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-<!-- Tailwind CSS Play CDN -->
+<!-- Tailwind CSS Play CDN — runtime scanner, not compiled Tailwind.
+     Acceptable for a local dev server (single user), but not production-grade.
+     It scans the DOM for class names and generates styles on-the-fly (~150kb gzipped). -->
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
 tailwind.config = {

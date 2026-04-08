@@ -263,12 +263,12 @@ class TestVersionConsistency:
 
     def test_init_version(self):
         from gitstyle import __version__
-        assert __version__ == "0.3.4"
+        assert __version__ == "0.4.0"
 
     def test_pyproject_version(self):
         pyproject = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text()
-        assert 'version = "0.3.4"' in pyproject
+        assert 'version = "0.4.0"' in pyproject
 
     def test_cli_version_test(self):
         test_cli = (Path(__file__).resolve().parent / "test_cli.py").read_text()
-        assert '"0.3.4"' in test_cli
+        assert '"0.4.0"' in test_cli

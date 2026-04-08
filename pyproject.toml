@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gitstyle"
-version = "0.3.4"
+version = "0.4.0"
 description = "Analyze a developer's GitHub commit history and compile it into a personal engineering style wiki."
 readme = "README.md"
 license = "MIT"
