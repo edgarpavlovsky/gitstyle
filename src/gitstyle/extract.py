@@ -53,21 +53,17 @@ def extract(
         console.print(f"[dim]Using cached extractions from {cache}[/dim]")
         return _load_extractions(cache)
 
-    llm = LLMClient(model=config.llm_model)
-
-    # Cost estimate
-    total_tokens = 0
-    for cluster in clusters:
-        prompt = _build_prompt(cluster)
-        total_tokens += llm.estimate_tokens(prompt)
     estimated_calls = len(clusters)
+    estimated_tokens = sum(len(_build_prompt(c)) // 4 for c in clusters)
     console.print(
         f"[bold]Extract stage:[/bold] {estimated_calls} LLM calls, "
-        f"~{total_tokens:,} input tokens"
+        f"~{estimated_tokens:,} input tokens"
     )
     if config.dry_run:
         console.print("[yellow]Dry run — skipping LLM calls[/yellow]")
         return []
+
+    llm = LLMClient(model=config.llm_model)
 
     extractions: list[ClusterExtraction] = []
     with Progress(

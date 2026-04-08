@@ -73,6 +73,16 @@ def run(
         dry_run=dry_run,
     )
 
+    # Validate LLM credentials early (before fetching anything)
+    if not dry_run:
+        from gitstyle.llm_client import LLMClient
+        try:
+            llm = LLMClient(model=model)
+            console.print(f"[dim]LLM auth: {llm._auth_method}[/dim]")
+        except RuntimeError as e:
+            console.print(f"[red]{e}[/red]")
+            raise typer.Exit(1)
+
     console.print(Panel(
         f"[bold]gitstyle[/bold] v{__version__}\n"
         f"Analyzing [cyan]{username}[/cyan]'s engineering style",

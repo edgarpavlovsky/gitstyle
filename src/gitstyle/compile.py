@@ -72,8 +72,6 @@ def compile_wiki(
         console.print(f"[dim]Using cached articles from {cache}[/dim]")
         return _load_articles(cache)
 
-    llm = LLMClient(model=config.llm_model)
-
     # Group observations by dimension
     by_dimension: dict[StyleDimension, list[Observation]] = defaultdict(list)
     by_language: dict[str, list[Observation]] = defaultdict(list)
@@ -93,6 +91,7 @@ def compile_wiki(
         console.print("[yellow]Dry run — skipping LLM calls[/yellow]")
         return []
 
+    llm = LLMClient(model=config.llm_model)
     articles: list[WikiArticle] = []
     repos_list = sorted(all_repos)
 

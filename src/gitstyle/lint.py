@@ -46,13 +46,12 @@ def lint(articles: list[WikiArticle], config: GitStyleConfig) -> LintReport:
         console.print("[yellow]No articles to lint[/yellow]")
         return LintReport()
 
-    llm = LLMClient(model=config.llm_model)
-
     console.print("[bold]Lint stage:[/bold] 1 LLM call")
     if config.dry_run:
         console.print("[yellow]Dry run — skipping LLM lint[/yellow]")
         return LintReport()
 
+    llm = LLMClient(model=config.llm_model)
     prompt = _build_lint_prompt(articles)
     try:
         data = llm.complete_json(LINT_SYSTEM, prompt)

@@ -32,7 +32,7 @@ pip install -e .
 
 ### Requirements
 
-- Python 3.10+
+- Python 3.9+
 - A GitHub token for API rate limits: `export GITHUB_TOKEN=ghp_...`
 - An Anthropic API key for LLM stages: `export ANTHROPIC_API_KEY=sk-ant-...`
 
@@ -43,7 +43,7 @@ pip install -e .
 gitstyle run karpathy
 
 # Or generate an org's engineering patterns wiki
-gitstyle run anthropic --max-repos 30
+gitstyle run anthropic
 
 # Output lands in wiki/ by default
 ls wiki/
@@ -99,16 +99,6 @@ last_updated: 2026-04-07
 
 Cross-references use `[[wikilinks]]` (Obsidian-compatible). Every claim cites specific commits by SHA.
 
-### Sampling strategy
-
-Not every commit goes through the LLM. gitstyle clusters commits by repo and language, then samples up to 20 per cluster using a **balanced** strategy:
-
-- ~1/3 most recent commits (captures current style)
-- ~1/3 largest diffs (captures substantive changes)
-- ~1/3 random (captures breadth)
-
-Configurable via `--strategy` (`balanced`, `recent`, `largest`) and `--max-samples`.
-
 ## Web Viewer
 
 gitstyle includes a built-in web viewer with an interactive knowledge graph:
@@ -124,12 +114,7 @@ gitstyle serve -w examples/karpathy
 gitstyle serve -w wiki/ --port 3000 --no-open
 ```
 
-The viewer has two modes:
-
-- **Graph view** (default) — Interactive force-directed graph showing how articles connect. Nodes are color-coded by category (gold = index, blue = style, green = language, gray = meta). Click any node to read the article. Hover to highlight connections.
-- **Article view** — Clean rendered markdown with syntax highlighting, confidence badges, and clickable wikilinks.
-
-Dark theme. Zero dependencies — uses your browser and CDN-loaded libraries. Works offline with graceful degradation.
+The viewer features a full-bleed force-directed graph with floating navigation and a slide-over article reader. Click any node to read the article. Built with Vue 3 + Tailwind CSS.
 
 ## How to Plug Into Your Coding Agent
 
@@ -142,13 +127,6 @@ Add to your project's `CLAUDE.md`:
 
 Load and follow the engineering style wiki in the `wiki/` directory for all code in this project.
 Start with wiki/index.md for an overview, then reference individual articles for specific conventions.
-```
-
-Or pass the wiki as context directly:
-
-```bash
-# Add wiki directory to Claude Code context
-claude --context wiki/
 ```
 
 ### Cursor
@@ -196,53 +174,70 @@ Follow these conventions when writing or reviewing code."""
 # Full pipeline
 gitstyle run <username> [options]
 
-# Fetch only (useful for inspecting data before running full pipeline)
-gitstyle fetch <username>
+# Individual stages (each requires cached data from prior stages)
+gitstyle fetch-cmd <username>
+gitstyle sample-cmd <username>
+gitstyle extract-cmd <username>
+gitstyle compile-cmd <username>
+gitstyle lint-cmd <username>
 
 # Launch web viewer with interactive graph
 gitstyle serve [-w wiki_dir]
 
+# Clean cached data
+gitstyle clean
+
 # Show version
-gitstyle version
+gitstyle --version
 ```
 
-### Options
+### Options for `run`
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--output, -o` | `wiki/` | Output directory |
 | `--cache` | `.gitstyle/` | Cache directory |
-| `--model, -m` | `claude-sonnet-4-20250514` | LLM model |
-| `--forks` | `false` | Include forked repos |
-| `--max-commits` | `200` | Max commits per repo |
-| `--max-repos` | `30` | Max repos to analyze (sorted by stars for orgs) |
-| `--max-samples` | `20` | Max samples per cluster |
+| `--max-commits, -n` | `2000` | Max commits to fetch |
+| `--samples, -s` | `20` | Samples per repo/language group |
+| `--repos, -r` | all | Comma-separated repo filter (`owner/name`) |
 | `--since` | — | Start date (ISO 8601) |
 | `--until` | — | End date (ISO 8601) |
-| `--include-repos` | — | Comma-separated repos to include |
-| `--exclude-repos` | — | Comma-separated repos to exclude |
-| `--strategy` | `balanced` | Sampling: balanced, recent, largest |
-| `--skip-lint` | `false` | Skip lint stage |
-| `--wiki-dir, -w` | `wiki/` | Wiki directory to serve (`serve`) |
-| `--port, -p` | `8080` | Port for `serve` command |
-| `--no-open` | `false` | Don't auto-open browser (`serve`) |
+| `--model, -m` | `claude-sonnet-4-20250514` | LLM model |
+| `--token, -t` | `$GITHUB_TOKEN` | GitHub token |
+| `--dry-run` | `false` | Show what would happen without LLM calls |
+
+### Options for `serve`
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--wiki-dir, -w` | `wiki/` | Wiki directory to serve |
+| `--port, -p` | `8080` | Port to listen on |
+| `--no-open` | `false` | Don't auto-open browser |
 
 ### Environment Variables
 
-- `GITHUB_TOKEN` — GitHub personal access token (recommended for rate limits, required for private repos)
-- `ANTHROPIC_API_KEY` — Anthropic API key for LLM stages
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_TOKEN` | GitHub personal access token (recommended for rate limits, required for private repos) |
+| `ANTHROPIC_API_KEY` | Anthropic API key for LLM stages |
+| `ANTHROPIC_AUTH_TOKEN` | Alternative: Anthropic OAuth token |
+
+If no API credentials are set, gitstyle will show a clear error before starting the pipeline.
 
 ## Caching
 
-gitstyle caches aggressively to avoid redundant API calls and LLM invocations:
+gitstyle caches intermediate data to avoid redundant API calls and LLM invocations:
 
-- `.gitstyle/repos.jsonl` — Fetched repo metadata
-- `.gitstyle/commits.jsonl` — Fetched commit summaries
-- `.gitstyle/diffs/<sha>.json` — Individual commit diffs
-- `.gitstyle/extractions/<cluster>.json` — LLM extraction results per cluster
-- `.gitstyle/articles/<slug>.json` — Compiled article data
+```
+.gitstyle/
+  commits.jsonl       # Fetched commit data
+  samples.json        # Sampled clusters
+  extractions.json    # LLM extraction results
+  articles.json       # Compiled article data
+  lint.json           # Lint report
+```
 
-Delete `.gitstyle/` to start fresh, or delete individual cache files to re-run specific stages.
+Delete `.gitstyle/` to start fresh (`gitstyle clean`), or delete individual cache files to re-run specific stages.
 
 ## Examples
 
