@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch, PropertyMock
 
+import anthropic
 import pytest
 
 from gitstyle.compile import _fix_wikilinks, _build_dimension_prompt, _build_language_prompt
@@ -730,3 +731,144 @@ class TestFetchCommitsAuthorExtraction:
 
         assert len(results) == 1
         assert results[0].author == "Bot User"
+
+
+# ---------------------------------------------------------------------------
+# LLMClient: retry on transient API errors (overloaded, rate limit)
+# ---------------------------------------------------------------------------
+
+class TestTransientAPIRetry:
+    @patch.object(LLMClient, '__init__', lambda self, **kwargs: None)
+    @patch('gitstyle.llm_client.time.sleep')
+    def test_retries_on_overloaded_error(self, mock_sleep):
+        """Should retry with backoff on overloaded_error."""
+        client = LLMClient()
+        client.model = "test"
+        client._client = MagicMock()
+        call_count = [0]
+
+        def mock_stream(**kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 2:
+                error = anthropic.APIStatusError(
+                    message="Overloaded",
+                    response=MagicMock(status_code=529, headers={}),
+                    body={"error": {"type": "overloaded_error", "message": "Overloaded"}},
+                )
+                raise error
+            # Third call succeeds
+            mock_ctx = MagicMock()
+            mock_msg = MagicMock()
+            mock_msg.stop_reason = "end_turn"
+            mock_msg.content = [MagicMock(text="success")]
+            mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+            mock_ctx.__exit__ = MagicMock(return_value=False)
+            mock_ctx.get_final_message.return_value = mock_msg
+            return mock_ctx
+
+        client._client.messages.stream = mock_stream
+        result = client.complete("system", "prompt")
+        assert result == "success"
+        assert call_count[0] == 3
+        assert mock_sleep.call_count == 2
+
+    @patch.object(LLMClient, '__init__', lambda self, **kwargs: None)
+    @patch('gitstyle.llm_client.time.sleep')
+    def test_retries_on_rate_limit_429(self, mock_sleep):
+        """Should retry on HTTP 429 rate limit."""
+        client = LLMClient()
+        client.model = "test"
+        client._client = MagicMock()
+        call_count = [0]
+
+        def mock_stream(**kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise anthropic.APIStatusError(
+                    message="Rate limited",
+                    response=MagicMock(status_code=429, headers={}),
+                    body={"error": {"type": "rate_limit_error", "message": "Rate limited"}},
+                )
+            mock_ctx = MagicMock()
+            mock_msg = MagicMock()
+            mock_msg.stop_reason = "end_turn"
+            mock_msg.content = [MagicMock(text="ok")]
+            mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+            mock_ctx.__exit__ = MagicMock(return_value=False)
+            mock_ctx.get_final_message.return_value = mock_msg
+            return mock_ctx
+
+        client._client.messages.stream = mock_stream
+        result = client.complete("system", "prompt")
+        assert result == "ok"
+        assert call_count[0] == 2
+
+    @patch.object(LLMClient, '__init__', lambda self, **kwargs: None)
+    @patch('gitstyle.llm_client.time.sleep')
+    def test_raises_after_max_retries(self, mock_sleep):
+        """Should raise after exhausting all retries."""
+        client = LLMClient()
+        client.model = "test"
+        client._client = MagicMock()
+
+        def mock_stream(**kwargs):
+            raise anthropic.APIStatusError(
+                message="Overloaded",
+                response=MagicMock(status_code=529, headers={}),
+                body={"error": {"type": "overloaded_error", "message": "Overloaded"}},
+            )
+
+        client._client.messages.stream = mock_stream
+        with pytest.raises(anthropic.APIStatusError):
+            client.complete("system", "prompt")
+        # Should have retried _MAX_RETRIES times
+        assert mock_sleep.call_count == LLMClient._MAX_RETRIES
+
+    @patch.object(LLMClient, '__init__', lambda self, **kwargs: None)
+    def test_does_not_retry_non_transient_errors(self):
+        """Non-transient errors (e.g. 400 bad request) should not be retried."""
+        client = LLMClient()
+        client.model = "test"
+        client._client = MagicMock()
+
+        def mock_stream(**kwargs):
+            raise anthropic.APIStatusError(
+                message="Bad request",
+                response=MagicMock(status_code=400, headers={}),
+                body={"error": {"type": "invalid_request_error", "message": "Bad request"}},
+            )
+
+        client._client.messages.stream = mock_stream
+        with pytest.raises(anthropic.APIStatusError):
+            client.complete("system", "prompt")
+
+    @patch.object(LLMClient, '__init__', lambda self, **kwargs: None)
+    @patch('gitstyle.llm_client.time.sleep')
+    def test_exponential_backoff_delays(self, mock_sleep):
+        """Backoff should double each attempt: 2, 4, 8, ..."""
+        client = LLMClient()
+        client.model = "test"
+        client._client = MagicMock()
+        call_count = [0]
+
+        def mock_stream(**kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 3:
+                raise anthropic.APIStatusError(
+                    message="Overloaded",
+                    response=MagicMock(status_code=529, headers={}),
+                    body={"error": {"type": "overloaded_error", "message": "Overloaded"}},
+                )
+            mock_ctx = MagicMock()
+            mock_msg = MagicMock()
+            mock_msg.stop_reason = "end_turn"
+            mock_msg.content = [MagicMock(text="ok")]
+            mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
+            mock_ctx.__exit__ = MagicMock(return_value=False)
+            mock_ctx.get_final_message.return_value = mock_msg
+            return mock_ctx
+
+        client._client.messages.stream = mock_stream
+        client.complete("system", "prompt")
+        delays = [call.args[0] for call in mock_sleep.call_args_list]
+        assert delays == [2.0, 4.0, 8.0]

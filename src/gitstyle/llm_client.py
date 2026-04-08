@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Optional
 
 import anthropic
@@ -34,6 +35,11 @@ class LLMClient:
 
         self.model = model
 
+    # Transient error types that should be retried with backoff
+    _RETRYABLE_ERRORS = ("overloaded_error", "rate_limit_error")
+    _MAX_RETRIES = 5
+    _BASE_DELAY = 2.0  # seconds — doubles each retry (2, 4, 8, 16, 32)
+
     def complete(
         self,
         system: str,
@@ -44,18 +50,41 @@ class LLMClient:
         """Send a prompt and return the text response.
 
         Uses streaming to avoid timeout errors with large models (e.g. Opus)
-        where requests may exceed 10 minutes.
+        where requests may exceed 10 minutes. Retries on transient API errors
+        (overloaded, rate limit) with exponential backoff.
         """
-        with self._client.messages.stream(
-            model=self.model,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            system=system,
-            messages=[{"role": "user", "content": prompt}],
-        ) as stream:
-            message = stream.get_final_message()
-        self._last_stop_reason = message.stop_reason
-        return message.content[0].text
+        last_error = None
+        for attempt in range(self._MAX_RETRIES + 1):
+            try:
+                with self._client.messages.stream(
+                    model=self.model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    system=system,
+                    messages=[{"role": "user", "content": prompt}],
+                ) as stream:
+                    message = stream.get_final_message()
+                self._last_stop_reason = message.stop_reason
+                return message.content[0].text
+            except anthropic.APIStatusError as e:
+                error_type = getattr(e.body, "get", lambda *a: None) if not isinstance(e.body, dict) else e.body.get
+                err_type = error_type("error", {}).get("type", "") if callable(error_type) else ""
+                # Also check dict-style body
+                if isinstance(e.body, dict):
+                    err_type = e.body.get("error", {}).get("type", "")
+
+                is_retryable = (
+                    err_type in self._RETRYABLE_ERRORS
+                    or e.status_code == 429
+                    or e.status_code >= 500
+                )
+                if is_retryable and attempt < self._MAX_RETRIES:
+                    delay = self._BASE_DELAY * (2 ** attempt)
+                    last_error = e
+                    time.sleep(delay)
+                    continue
+                raise
+        raise last_error  # type: ignore[misc]
 
     def complete_json(
         self,
