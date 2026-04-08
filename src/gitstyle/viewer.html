@@ -4,74 +4,162 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gitstyle — Engineering Style Wiki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
   --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;
   --fg:#e6edf3;--fg2:#8b949e;--fg3:#484f58;
-  --accent:#58a6ff;--accent2:#3fb950;
-  --gold:#d29922;--blue:#58a6ff;--green:#3fb950;--gray:#8b949e;
+  --accent:#7c5cfc;--accent2:#00e676;
+  --gold:#f0a500;--blue:#7c5cfc;--green:#00e676;--gray:#607d8b;
   --border:#30363d;--radius:6px;
 }
-html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);overflow:hidden}
+html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);overflow:hidden}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
 
 /* Layout */
 #app{display:flex;height:100vh}
-#sidebar{width:260px;min-width:260px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
-#sidebar-header{padding:16px;border-bottom:1px solid var(--border)}
-#sidebar-header h1{font-size:14px;font-weight:600;color:var(--fg)}
-#sidebar-header .subtitle{font-size:11px;color:var(--fg2);margin-top:2px}
+#sidebar{
+  width:260px;min-width:260px;
+  background:rgba(22,27,34,0.85);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-right:1px solid rgba(124,92,252,0.15);
+  display:flex;flex-direction:column;overflow:hidden;
+  position:relative;z-index:10;
+}
+#sidebar::before{
+  content:'';position:absolute;top:0;left:0;bottom:0;width:1px;
+  background:linear-gradient(180deg,rgba(124,92,252,0.6) 0%,rgba(124,92,252,0.1) 50%,rgba(0,230,118,0.3) 100%);
+  z-index:1;
+}
+#sidebar-header{padding:16px;position:relative}
+#sidebar-header::after{
+  content:'';position:absolute;bottom:0;left:16px;right:16px;height:1px;
+  background:linear-gradient(90deg,rgba(124,92,252,0.5),rgba(124,92,252,0.05));
+}
+#sidebar-header h1{font-size:14px;font-weight:700;color:var(--fg);letter-spacing:0.5px}
+#sidebar-header .subtitle{font-size:11px;color:var(--fg2);margin-top:2px;font-weight:400}
 #sidebar-nav{flex:1;overflow-y:auto;padding:8px 0}
-.nav-section{padding:8px 16px 4px;font-size:11px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:.5px}
-.nav-item{display:block;padding:6px 16px 6px 24px;font-size:13px;color:var(--fg2);cursor:pointer;border-left:2px solid transparent;transition:all .15s}
-.nav-item:hover{color:var(--fg);background:var(--bg3)}
-.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(56,139,253,.1)}
-#sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--fg3)}
+.nav-section{padding:10px 16px 4px;font-size:10px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:1px}
+.nav-item{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 16px 7px 20px;font-size:13px;font-weight:400;color:var(--fg2);
+  cursor:pointer;border-left:2px solid transparent;
+  transition:all 0.2s ease;position:relative;
+}
+.nav-item::before{
+  content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0;
+  background:var(--gray);transition:all 0.2s ease;
+}
+.nav-item[data-cat="index"]::before{background:var(--gold)}
+.nav-item[data-cat="dimension"]::before,
+.nav-item[data-cat="style"]::before{background:var(--blue)}
+.nav-item[data-cat="language"]::before{background:var(--green)}
+.nav-item[data-cat="meta"]::before{background:var(--gray)}
+.nav-item:hover{color:var(--fg);background:rgba(124,92,252,0.08);padding-left:24px}
+.nav-item.active{
+  color:var(--accent);border-left-color:var(--accent);
+  background:rgba(124,92,252,0.12);
+  border-top-left-radius:0;border-bottom-left-radius:0;
+  border-top-right-radius:6px;border-bottom-right-radius:6px;
+  font-weight:500;
+}
+#sidebar-footer{padding:12px 16px;border-top:1px solid rgba(48,54,61,0.5);font-size:11px;color:var(--fg3);font-weight:400}
 
 /* Main area */
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-#toolbar{height:44px;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid var(--border);background:var(--bg2);gap:8px}
-.tab{padding:6px 14px;font-size:13px;color:var(--fg2);cursor:pointer;border-radius:var(--radius);transition:all .15s}
-.tab:hover{color:var(--fg);background:var(--bg3)}
-.tab.active{color:var(--fg);background:var(--bg3);font-weight:600}
-#breadcrumb{margin-left:auto;font-size:12px;color:var(--fg3)}
+#toolbar{
+  height:48px;display:flex;align-items:center;padding:0 16px;
+  border-bottom:1px solid var(--border);
+  background:rgba(22,27,34,0.7);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  gap:8px;
+}
+.tab{
+  padding:6px 16px;font-size:13px;font-weight:500;color:var(--fg2);
+  cursor:pointer;border-radius:20px;
+  transition:all 0.2s ease;position:relative;
+}
+.tab:hover{color:var(--fg);background:rgba(124,92,252,0.1)}
+.tab.active{
+  color:var(--fg);background:rgba(124,92,252,0.15);font-weight:600;
+  box-shadow:0 0 12px rgba(124,92,252,0.2);
+}
+.tab.active::after{
+  content:'';position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);
+  width:60%;height:2px;border-radius:1px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+}
+#breadcrumb{margin-left:auto;font-size:12px;color:var(--fg3);font-weight:400}
 
 #content{flex:1;overflow:hidden;position:relative}
-#graph-view,#article-view{position:absolute;inset:0;overflow:hidden}
+#graph-view,#article-view{position:absolute;inset:0;overflow:hidden;transition:opacity 0.3s ease}
 #article-view{overflow-y:auto;padding:32px 48px;display:none}
 #graph-view svg{width:100%;height:100%}
+#graph-view{
+  background:
+    radial-gradient(ellipse at 50% 50%, #0f1528 0%, #0a0e1a 70%),
+    radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 100% 100%, 30px 30px;
+}
 
 /* Article markdown styles */
-.article-meta{margin-bottom:24px;padding:16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)}
-.article-meta h1{font-size:24px;margin-bottom:8px}
-.badge{display:inline-block;padding:2px 8px;font-size:11px;border-radius:12px;font-weight:600;margin-right:6px}
-.badge-high{background:rgba(63,185,80,.15);color:var(--green)}
-.badge-medium{background:rgba(210,153,34,.15);color:var(--gold)}
-.badge-low{background:rgba(248,81,73,.15);color:#f85149}
-.badge-category{background:rgba(88,166,255,.15);color:var(--accent)}
+.article-meta{
+  margin-bottom:24px;padding:20px;
+  border-radius:8px;
+  background:
+    linear-gradient(var(--bg2),var(--bg2)) padding-box,
+    linear-gradient(135deg,rgba(124,92,252,0.5),rgba(88,166,255,0.3)) border-box;
+  border:1px solid transparent;
+}
+.article-meta h1{font-size:24px;margin-bottom:10px;font-weight:700}
+.badge{
+  display:inline-block;padding:4px 12px;font-size:11px;
+  border-radius:20px;font-weight:600;margin-right:6px;
+  transition:all 0.2s ease;
+}
+.badge-high{background:rgba(0,230,118,0.12);color:var(--green);box-shadow:0 0 8px rgba(0,230,118,0.15)}
+.badge-medium{background:rgba(240,165,0,0.12);color:var(--gold);box-shadow:0 0 8px rgba(240,165,0,0.15)}
+.badge-low{background:rgba(248,81,73,.12);color:#f85149;box-shadow:0 0 8px rgba(248,81,73,0.15)}
+.badge-category{background:rgba(124,92,252,0.12);color:var(--accent);box-shadow:0 0 8px rgba(124,92,252,0.15)}
 .meta-row{font-size:12px;color:var(--fg2);margin-top:6px}
 
 /* Markdown rendered content */
-.md-body{line-height:1.7;font-size:15px}
-.md-body h1{font-size:22px;margin:28px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
-.md-body h2{font-size:18px;margin:24px 0 10px}
-.md-body h3{font-size:15px;margin:20px 0 8px}
+.md-body{line-height:1.8;font-size:16px;max-width:800px;margin:0 auto}
+.md-body h1{font-size:22px;margin:28px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border);font-weight:700}
+.md-body h2{font-size:18px;margin:24px 0 10px;font-weight:600}
+.md-body h3{font-size:15px;margin:20px 0 8px;font-weight:600}
 .md-body p{margin:12px 0}
 .md-body ul,.md-body ol{margin:12px 0;padding-left:24px}
 .md-body li{margin:4px 0}
-.md-body code{background:var(--bg3);padding:2px 6px;border-radius:3px;font-size:13px}
-.md-body pre{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;overflow-x:auto;margin:16px 0}
+.md-body code{background:var(--bg3);padding:2px 6px;border-radius:4px;font-size:13px}
+.md-body pre{
+  background:var(--bg2);
+  border:1px solid rgba(124,92,252,0.15);
+  border-radius:8px;padding:16px;overflow-x:auto;margin:16px 0;
+  box-shadow:0 0 16px rgba(124,92,252,0.05);
+}
 .md-body pre code{background:none;padding:0}
-.md-body blockquote{border-left:3px solid var(--border);padding-left:16px;color:var(--fg2);margin:12px 0}
+.md-body blockquote{border-left:3px solid var(--accent);padding-left:16px;color:var(--fg2);margin:12px 0}
 .md-body table{border-collapse:collapse;margin:12px 0;width:100%}
 .md-body th,.md-body td{padding:8px 12px;border:1px solid var(--border);text-align:left}
 .md-body th{background:var(--bg2);font-weight:600}
 .md-body a{color:var(--accent)}
 
 /* Graph tooltip */
-.graph-tooltip{position:absolute;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:100}
+.graph-tooltip{
+  position:absolute;padding:10px 16px;
+  background:rgba(22,27,34,0.9);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border:1px solid rgba(124,92,252,0.25);
+  border-radius:8px;font-size:13px;
+  pointer-events:none;opacity:0;
+  transition:opacity 0.2s ease;z-index:100;
+  box-shadow:0 4px 20px rgba(0,0,0,0.4),0 0 12px rgba(124,92,252,0.1);
+}
 
 /* CDN error */
 #cdn-error{display:none;position:absolute;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;flex-direction:column;padding:48px;text-align:center}
@@ -79,10 +167,26 @@ a:hover{text-decoration:underline}
 #cdn-error p{color:var(--fg2);max-width:480px;line-height:1.6}
 
 /* Scrollbar */
-::-webkit-scrollbar{width:8px}
-::-webkit-scrollbar-track{background:var(--bg)}
-::-webkit-scrollbar-thumb{background:var(--fg3);border-radius:4px}
-::-webkit-scrollbar-thumb:hover{background:var(--fg2)}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.18)}
+
+/* Graph node hover scale */
+#graph-view circle{transition:transform 0.2s ease,filter 0.2s ease}
+
+/* Index node pulsing glow */
+@keyframes indexPulse{
+  0%,100%{filter:url(#glow) drop-shadow(0 0 6px rgba(240,165,0,0.6))}
+  50%{filter:url(#glow) drop-shadow(0 0 14px rgba(240,165,0,0.9))}
+}
+.index-node{animation:indexPulse 2.5s ease-in-out infinite}
+
+/* View fade transitions */
+.view-fade-in{animation:fadeIn 0.3s ease forwards}
+.view-fade-out{animation:fadeOut 0.2s ease forwards}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeOut{from{opacity:1}to{opacity:0}}
 </style>
 </head>
 <body>
@@ -167,6 +271,7 @@ let graphData = null;
 let currentView = 'graph';
 let currentFile = null;
 let simulation = null;
+let particleAnimId = null;
 
 // API
 async function apiFetch(path) {
@@ -198,7 +303,8 @@ function renderSidebar() {
     groups[key].forEach(f => {
       const title = f.meta.title || f.slug;
       const active = currentFile === f.path ? ' active' : '';
-      html += `<div class="nav-item${active}" data-path="${f.path}">${title}</div>`;
+      const cat = f.meta.category || 'meta';
+      html += `<div class="nav-item${active}" data-path="${f.path}" data-cat="${cat}">${title}</div>`;
     });
   });
   nav.innerHTML = html;
@@ -233,12 +339,18 @@ function updateTabs() {
   document.querySelectorAll('.tab').forEach(t => {
     t.classList.toggle('active', t.dataset.view === currentView);
   });
+  const graphView = document.getElementById('graph-view');
+  const articleView = document.getElementById('article-view');
   if (currentView === 'graph') {
-    document.getElementById('graph-view').style.display = 'block';
-    document.getElementById('article-view').style.display = 'none';
+    graphView.style.display = 'block';
+    articleView.style.display = 'none';
+    graphView.classList.remove('view-fade-out');
+    graphView.classList.add('view-fade-in');
   } else {
-    document.getElementById('graph-view').style.display = 'none';
-    document.getElementById('article-view').style.display = 'block';
+    graphView.style.display = 'none';
+    articleView.style.display = 'block';
+    articleView.classList.remove('view-fade-out');
+    articleView.classList.add('view-fade-in');
   }
 }
 
@@ -311,14 +423,16 @@ async function renderArticle(path) {
 
 // Graph
 const CATEGORY_COLORS = {
-  index: '#d29922',
-  dimension: '#58a6ff',
-  language: '#3fb950',
-  meta: '#8b949e',
+  index: '#f0a500',
+  dimension: '#7c5cfc',
+  style: '#7c5cfc',
+  language: '#00e676',
+  meta: '#607d8b',
 };
 
 function renderGraph() {
   if (!graphData || !cdnReady) return;
+  if (particleAnimId) cancelAnimationFrame(particleAnimId);
 
   const container = document.getElementById('graph-view');
   container.innerHTML = '';
@@ -331,16 +445,54 @@ function renderGraph() {
     .attr('width', width)
     .attr('height', height);
 
+  // SVG defs — glow filter and edge gradients
+  const defs = svg.append('defs');
+
+  // Glow filter
+  const glowFilter = defs.append('filter')
+    .attr('id', 'glow')
+    .attr('x', '-50%').attr('y', '-50%')
+    .attr('width', '200%').attr('height', '200%');
+  glowFilter.append('feGaussianBlur')
+    .attr('stdDeviation', '4')
+    .attr('result', 'coloredBlur');
+  const glowMerge = glowFilter.append('feMerge');
+  glowMerge.append('feMergeNode').attr('in', 'coloredBlur');
+  glowMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+  // Intense glow filter for hover
+  const glowHoverFilter = defs.append('filter')
+    .attr('id', 'glow-hover')
+    .attr('x', '-50%').attr('y', '-50%')
+    .attr('width', '200%').attr('height', '200%');
+  glowHoverFilter.append('feGaussianBlur')
+    .attr('stdDeviation', '8')
+    .attr('result', 'coloredBlur');
+  const glowHoverMerge = glowHoverFilter.append('feMerge');
+  glowHoverMerge.append('feMergeNode').attr('in', 'coloredBlur');
+  glowHoverMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+  // Edge gradient (lighter at source, fades to edge color)
+  const edgeGradient = defs.append('linearGradient')
+    .attr('id', 'edge-gradient')
+    .attr('gradientUnits', 'userSpaceOnUse');
+  edgeGradient.append('stop')
+    .attr('offset', '0%')
+    .attr('stop-color', 'rgba(160,170,200,0.5)');
+  edgeGradient.append('stop')
+    .attr('offset', '100%')
+    .attr('stop-color', 'rgba(120,130,160,0.2)');
+
   // Zoom layer
   const g = svg.append('g');
-  svg.call(d3.zoom()
+  const zoomBehavior = d3.zoom()
     .scaleExtent([0.2, 4])
-    .on('zoom', (event) => g.attr('transform', event.transform))
-  );
+    .on('zoom', (event) => g.attr('transform', event.transform));
+  svg.call(zoomBehavior);
 
   // Scale node size by link count
   const maxLinks = Math.max(1, d3.max(graphData.nodes, d => d.links) || 1);
-  const rScale = d3.scaleSqrt().domain([0, maxLinks]).range([6, 22]);
+  const rScale = d3.scaleSqrt().domain([0, maxLinks]).range([8, 28]);
 
   // Build simulation
   const linkData = graphData.edges.map(e => ({
@@ -349,19 +501,61 @@ function renderGraph() {
   }));
 
   simulation = d3.forceSimulation(graphData.nodes)
-    .force('link', d3.forceLink(linkData).id(d => d.id).distance(80))
-    .force('charge', d3.forceManyBody().strength(-200))
-    .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collision', d3.forceCollide().radius(d => rScale(d.links) + 4));
+    .force('link', d3.forceLink(linkData).id(d => d.id).distance(200))
+    .force('charge', d3.forceManyBody().strength(-700))
+    .force('center', d3.forceCenter(width / 2, height / 2).strength(0.03))
+    .force('collision', d3.forceCollide().radius(d => rScale(d.links) + 25))
+    .alphaDecay(0.015);
 
-  // Links
+  // Links — curved paths instead of lines
   const link = g.append('g')
-    .selectAll('line')
+    .selectAll('path')
     .data(linkData)
-    .join('line')
-    .attr('stroke', '#30363d')
+    .join('path')
+    .attr('fill', 'none')
+    .attr('stroke', 'rgba(120,130,160,0.3)')
     .attr('stroke-width', 1)
-    .attr('stroke-opacity', 0.6);
+    .attr('stroke-opacity', 0.3);
+
+  // Edge particles — small dots traveling along links
+  const particles = g.append('g').attr('class', 'particles');
+  const particleData = linkData.map((l, i) => ({
+    link: l,
+    offset: Math.random(),
+    speed: 0.0003 + Math.random() * 0.0005,
+    index: i,
+  }));
+  const particleCircles = particles.selectAll('circle')
+    .data(particleData)
+    .join('circle')
+    .attr('r', 1.5)
+    .attr('fill', '#ffffff')
+    .attr('opacity', 0.25);
+
+  function animateParticles() {
+    particleCircles.each(function(d) {
+      d.offset = (d.offset + d.speed * 16) % 1;
+      const s = d.link.source, t = d.link.target;
+      const sx = typeof s === 'object' ? s.x : 0;
+      const sy = typeof s === 'object' ? s.y : 0;
+      const tx = typeof t === 'object' ? t.x : 0;
+      const ty = typeof t === 'object' ? t.y : 0;
+      // Follow the curved path (quadratic bezier interpolation)
+      const dx = tx - sx, dy = ty - sy;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const off = dist * 0.12;
+      const mx = (sx + tx) / 2 + (dy / dist) * off;
+      const my = (sy + ty) / 2 - (dx / dist) * off;
+      const p = d.offset;
+      const ip = 1 - p;
+      // Quadratic bezier: B(t) = (1-t)^2*P0 + 2*(1-t)*t*P1 + t^2*P2
+      const cx = ip * ip * sx + 2 * ip * p * mx + p * p * tx;
+      const cy = ip * ip * sy + 2 * ip * p * my + p * p * ty;
+      d3.select(this).attr('cx', cx).attr('cy', cy);
+    });
+    particleAnimId = requestAnimationFrame(animateParticles);
+  }
+  particleAnimId = requestAnimationFrame(animateParticles);
 
   // Nodes
   const node = g.append('g')
@@ -372,7 +566,9 @@ function renderGraph() {
     .attr('fill', d => CATEGORY_COLORS[d.category] || CATEGORY_COLORS.meta)
     .attr('stroke', '#0d1117')
     .attr('stroke-width', 1.5)
-    .attr('cursor', 'pointer');
+    .attr('cursor', 'pointer')
+    .attr('filter', 'url(#glow)')
+    .attr('class', d => d.category === 'index' ? 'index-node' : '');
 
   // Labels
   const label = g.append('g')
@@ -380,11 +576,14 @@ function renderGraph() {
     .data(graphData.nodes)
     .join('text')
     .text(d => d.title)
-    .attr('font-size', 11)
+    .attr('font-size', 12)
+    .attr('font-weight', 500)
+    .attr('font-family', "'Inter',-apple-system,BlinkMacSystemFont,sans-serif")
     .attr('fill', '#e6edf3')
     .attr('text-anchor', 'middle')
-    .attr('dy', d => rScale(d.links) + 14)
-    .attr('pointer-events', 'none');
+    .attr('dy', d => rScale(d.links) + 16)
+    .attr('pointer-events', 'none')
+    .style('text-shadow', '0 1px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)');
 
   // Drag
   node.call(d3.drag()
@@ -415,13 +614,27 @@ function renderGraph() {
     });
     connected.add(d.id);
 
-    node.attr('opacity', n => connected.has(n.id) ? 1 : 0.15);
-    link.attr('stroke-opacity', l => {
+    node.attr('opacity', n => connected.has(n.id) ? 1 : 0.12)
+        .attr('filter', n => n.id === d.id ? 'url(#glow-hover)' : 'url(#glow)');
+    link.attr('stroke', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return connected.has(sid) && connected.has(tid) ? 'rgba(124,92,252,0.4)' : 'rgba(120,130,160,0.05)';
+    }).attr('stroke-opacity', l => {
       const sid = typeof l.source === 'object' ? l.source.id : l.source;
       const tid = typeof l.target === 'object' ? l.target.id : l.target;
       return connected.has(sid) && connected.has(tid) ? 0.8 : 0.05;
+    }).attr('stroke-width', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return connected.has(sid) && connected.has(tid) ? 1.5 : 1;
     });
-    label.attr('opacity', n => connected.has(n.id) ? 1 : 0.1);
+    label.attr('opacity', n => connected.has(n.id) ? 1 : 0.06);
+    particleCircles.attr('opacity', pd => {
+      const sid = typeof pd.link.source === 'object' ? pd.link.source.id : pd.link.source;
+      const tid = typeof pd.link.target === 'object' ? pd.link.target.id : pd.link.target;
+      return connected.has(sid) && connected.has(tid) ? 0.5 : 0.04;
+    });
 
     tooltip.style.opacity = 1;
     tooltip.innerHTML = `<strong>${d.title}</strong><br>${d.category} &middot; ${d.links} connections`;
@@ -433,24 +646,54 @@ function renderGraph() {
     tooltip.style.top = (event.pageY - 12) + 'px';
   })
   .on('mouseout', () => {
-    node.attr('opacity', 1);
-    link.attr('stroke-opacity', 0.6);
+    node.attr('opacity', 1).attr('filter', 'url(#glow)');
+    link.attr('stroke', 'rgba(120,130,160,0.3)').attr('stroke-opacity', 0.3).attr('stroke-width', 1);
     label.attr('opacity', 1);
+    particleCircles.attr('opacity', 0.25);
     tooltip.style.opacity = 0;
   });
 
-  // Click to navigate
+  // Click — ripple connected nodes + smooth zoom + navigate
   node.on('click', (event, d) => {
-    navigateTo(d.id);
+    // Ripple: briefly pulse connected nodes
+    const connected = new Set();
+    linkData.forEach(l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      if (sid === d.id) connected.add(tid);
+      if (tid === d.id) connected.add(sid);
+    });
+    node.filter(n => connected.has(n.id))
+      .transition().duration(200)
+      .attr('r', n => rScale(n.links) * 1.2)
+      .transition().duration(300)
+      .attr('r', n => rScale(n.links));
+
+    // Smooth pan to clicked node
+    const transform = d3.zoomTransform(svg.node());
+    const scale = Math.max(transform.k, 1.2);
+    svg.transition().duration(600).ease(d3.easeCubicInOut)
+      .call(zoomBehavior.transform,
+        d3.zoomIdentity.translate(width / 2, height / 2).scale(scale).translate(-d.x, -d.y)
+      );
+
+    setTimeout(() => navigateTo(d.id), 300);
   });
+
+  // Compute curved path for edges
+  function linkArc(d) {
+    const dx = d.target.x - d.source.x;
+    const dy = d.target.y - d.source.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const offset = dist * 0.12;
+    const mx = (d.source.x + d.target.x) / 2 + (dy / dist) * offset;
+    const my = (d.source.y + d.target.y) / 2 - (dx / dist) * offset;
+    return `M${d.source.x},${d.source.y} Q${mx},${my} ${d.target.x},${d.target.y}`;
+  }
 
   // Tick
   simulation.on('tick', () => {
-    link
-      .attr('x1', d => d.source.x)
-      .attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x)
-      .attr('y2', d => d.target.y);
+    link.attr('d', linkArc);
     node
       .attr('cx', d => d.x)
       .attr('cy', d => d.y);
