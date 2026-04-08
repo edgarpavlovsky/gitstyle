@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gitstyle — Engineering Style Wiki</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%237c5cfc'/%3E%3Cstop offset='100%25' stop-color='%2300e676'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='15' fill='%230d1117' stroke='url(%23g)' stroke-width='2'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Inter,system-ui,sans-serif' font-weight='700' font-size='18' fill='url(%23g)'%3Eg%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -96,8 +97,8 @@ a:hover{text-decoration:underline}
 #breadcrumb{margin-left:auto;font-size:12px;color:var(--fg3);font-weight:400}
 
 #content{flex:1;overflow:hidden;position:relative}
-#graph-view,#article-view{position:absolute;inset:0;overflow:hidden;transition:opacity 0.3s ease}
-#article-view{overflow-y:auto;padding:32px 48px;display:none}
+#graph-view,#article-view{position:absolute;inset:0;overflow:hidden}
+#article-view{overflow-y:auto;padding:32px 48px;display:none;color:var(--fg);background:var(--bg)}
 #graph-view svg{width:100%;height:100%}
 #graph-view{
   background:
@@ -182,11 +183,7 @@ a:hover{text-decoration:underline}
 }
 .index-node{animation:indexPulse 2.5s ease-in-out infinite}
 
-/* View fade transitions */
-.view-fade-in{animation:fadeIn 0.3s ease forwards}
-.view-fade-out{animation:fadeOut 0.2s ease forwards}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes fadeOut{from{opacity:1}to{opacity:0}}
+/* View transitions removed — simple display toggle is more reliable across browsers */
 </style>
 </head>
 <body>
@@ -344,13 +341,9 @@ function updateTabs() {
   if (currentView === 'graph') {
     graphView.style.display = 'block';
     articleView.style.display = 'none';
-    graphView.classList.remove('view-fade-out');
-    graphView.classList.add('view-fade-in');
   } else {
     graphView.style.display = 'none';
     articleView.style.display = 'block';
-    articleView.classList.remove('view-fade-out');
-    articleView.classList.add('view-fade-in');
   }
 }
 
@@ -501,11 +494,11 @@ function renderGraph() {
   }));
 
   simulation = d3.forceSimulation(graphData.nodes)
-    .force('link', d3.forceLink(linkData).id(d => d.id).distance(200))
-    .force('charge', d3.forceManyBody().strength(-700))
-    .force('center', d3.forceCenter(width / 2, height / 2).strength(0.03))
-    .force('collision', d3.forceCollide().radius(d => rScale(d.links) + 25))
-    .alphaDecay(0.015);
+    .force('link', d3.forceLink(linkData).id(d => d.id).distance(300))
+    .force('charge', d3.forceManyBody().strength(-1500).distanceMax(800))
+    .force('center', d3.forceCenter(width / 2, height / 2).strength(0.02))
+    .force('collision', d3.forceCollide().radius(d => rScale(d.links) + 40))
+    .alphaDecay(0.01);
 
   // Links — curved paths instead of lines
   const link = g.append('g')

@@ -135,15 +135,9 @@ def _build_graph(files: list[dict[str, Any]]) -> dict[str, Any]:
     return {"nodes": nodes, "edges": unique_edges}
 
 
-_VIEWER_HTML: str | None = None
-
-
 def _get_viewer_html() -> str:
-    global _VIEWER_HTML
-    if _VIEWER_HTML is None:
-        viewer_path = Path(__file__).parent / "viewer.html"
-        _VIEWER_HTML = viewer_path.read_text(encoding="utf-8")
-    return _VIEWER_HTML
+    viewer_path = Path(__file__).parent / "viewer.html"
+    return viewer_path.read_text(encoding="utf-8")
 
 
 class WikiHandler(SimpleHTTPRequestHandler):
@@ -165,6 +159,7 @@ class WikiHandler(SimpleHTTPRequestHandler):
         body = html.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
