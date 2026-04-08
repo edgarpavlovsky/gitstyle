@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Optional
@@ -50,8 +51,13 @@ def run(
     model: str = typer.Option("claude-sonnet-4-20250514", "--model", "-m", help="LLM model to use."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would happen without making LLM calls."),
     token: Optional[str] = typer.Option(None, "--token", "-t", help="GitHub token (or set GITHUB_TOKEN env var)."),
+    fresh: bool = typer.Option(False, "--fresh", help="Force full re-run, ignoring cache."),
 ):
-    """Run the full pipeline: fetch → sample → extract → compile → lint → write."""
+    """Run the full pipeline: fetch → sample → extract → compile → lint → write.
+
+    By default, runs incrementally — only fetching new commits since the last run
+    and evolving the existing wiki. Use --fresh to force a full rebuild.
+    """
     github_token = token or os.environ.get("GITHUB_TOKEN")
     if not github_token:
         console.print("[red]Error: Set GITHUB_TOKEN env var or pass --token[/red]")
@@ -71,6 +77,7 @@ def run(
         until=until,
         llm_model=model,
         dry_run=dry_run,
+        fresh=fresh,
     )
 
     # Validate GitHub token early
@@ -98,7 +105,8 @@ def run(
 
     console.print(Panel(
         f"[bold]gitstyle[/bold] v{__version__}\n"
-        f"Analyzing [cyan]{username}[/cyan]'s engineering style",
+        f"Analyzing [cyan]{username}[/cyan]'s engineering style"
+        f"{' [dim](fresh run)[/dim]' if fresh else ''}",
         border_style="blue",
     ))
 
@@ -114,6 +122,7 @@ def fetch_cmd(
     since: Optional[str] = typer.Option(None, "--since"),
     until: Optional[str] = typer.Option(None, "--until"),
     token: Optional[str] = typer.Option(None, "--token", "-t"),
+    fresh: bool = typer.Option(False, "--fresh"),
 ):
     """Run only the fetch stage."""
     from gitstyle.fetch import fetch
@@ -123,8 +132,12 @@ def fetch_cmd(
     config = GitStyleConfig(
         username=username, github_token=github_token, cache_dir=cache_dir,
         max_commits=max_commits, repos=repos_list, since=since, until=until,
+        fresh=fresh,
     )
-    fetch(config)
+    result = fetch(config)
+    console.print(f"Total commits: {len(result.all_commits)}")
+    if result.is_incremental:
+        console.print(f"New commits: {len(result.new_commits)}")
 
 
 @app.command()
@@ -138,8 +151,8 @@ def sample_cmd(
     from gitstyle.sample import sample
 
     config = GitStyleConfig(username=username, cache_dir=cache_dir, samples_per_group=samples)
-    commits = fetch(config)
-    sample(commits, config)
+    result = fetch(config)
+    sample(result.all_commits, config)
 
 
 @app.command()
@@ -157,8 +170,8 @@ def extract_cmd(
     config = GitStyleConfig(
         username=username, cache_dir=cache_dir, llm_model=model, dry_run=dry_run,
     )
-    commits = fetch(config)
-    clusters = sample(commits, config)
+    result = fetch(config)
+    clusters = sample(result.all_commits, config)
     extract(clusters, config)
 
 
@@ -180,8 +193,8 @@ def compile_cmd(
         username=username, cache_dir=cache_dir, output_dir=output,
         llm_model=model, dry_run=dry_run,
     )
-    commits = fetch(config)
-    clusters = sample(commits, config)
+    result = fetch(config)
+    clusters = sample(result.all_commits, config)
     extractions = extract(clusters, config)
     compile_wiki(extractions, config)
 
@@ -203,8 +216,8 @@ def lint_cmd(
     config = GitStyleConfig(
         username=username, cache_dir=cache_dir, llm_model=model, dry_run=dry_run,
     )
-    commits = fetch(config)
-    clusters = sample(commits, config)
+    result = fetch(config)
+    clusters = sample(result.all_commits, config)
     extractions = extract(clusters, config)
     articles = compile_wiki(extractions, config)
     lint(articles, config)
@@ -258,23 +271,56 @@ def clean(
 
 
 def _run_pipeline(config: GitStyleConfig) -> None:
-    from gitstyle.compile import compile_wiki
-    from gitstyle.extract import extract
+    from gitstyle.compile import compile_wiki, evolve_wiki
+    from gitstyle.extract import extract, merge_extractions
     from gitstyle.fetch import fetch
     from gitstyle.lint import lint
     from gitstyle.sample import sample
     from gitstyle.wiki_writer import write_wiki
 
-    # Stage 1: Fetch
+    # Stage 1: Fetch (incremental-aware)
     console.rule("[bold blue]Stage 1: Fetch")
-    commits = fetch(config)
-    if not commits:
+    fetch_result = fetch(config)
+    if not fetch_result.all_commits:
         console.print(
             "[red]Error: No commits found.[/red]\n"
             "[dim]Check that the username is correct and has public repos with commits.\n"
             "If you previously ran this command and it failed, try: gitstyle clean[/dim]"
         )
         return
+
+    # Decide: incremental or full pipeline
+    has_existing_articles = config.articles_path().exists()
+    has_new_commits = len(fetch_result.new_commits) > 0
+    is_incremental = (
+        fetch_result.is_incremental
+        and has_new_commits
+        and has_existing_articles
+        and not config.fresh
+    )
+
+    if fetch_result.is_incremental and not has_new_commits:
+        if has_existing_articles:
+            console.print(
+                "\n[green]No new commits since last run — wiki is up to date.[/green]\n"
+                "[dim]Use --fresh to force a full rebuild.[/dim]"
+            )
+            return
+        # Has cached commits but no articles — fall through to full pipeline
+
+    if is_incremental:
+        _run_incremental_pipeline(fetch_result, config)
+    else:
+        _run_full_pipeline(fetch_result.all_commits, config)
+
+
+def _run_full_pipeline(commits: list, config: GitStyleConfig) -> None:
+    """Standard full pipeline — analyze all commits from scratch."""
+    from gitstyle.compile import compile_wiki
+    from gitstyle.extract import extract
+    from gitstyle.lint import lint
+    from gitstyle.sample import sample
+    from gitstyle.wiki_writer import write_wiki
 
     # Stage 2: Sample
     console.rule("[bold blue]Stage 2: Sample")
@@ -315,5 +361,80 @@ def _run_pipeline(config: GitStyleConfig) -> None:
         f"[bold green]Done![/bold green]\n"
         f"Wiki written to [cyan]{wiki_path}[/cyan]\n"
         f"Open in Obsidian or any markdown viewer.",
+        border_style="green",
+    ))
+
+
+def _run_incremental_pipeline(fetch_result, config: GitStyleConfig) -> None:
+    """Incremental pipeline — process only new commits, evolve existing wiki."""
+    from gitstyle.compile import evolve_wiki, _load_articles
+    from gitstyle.extract import extract, merge_extractions, _load_extractions
+    from gitstyle.lint import lint
+    from gitstyle.sample import sample
+    from gitstyle.wiki_writer import write_wiki
+
+    new_commits = fetch_result.new_commits
+    console.print(
+        f"\n[bold cyan]Incremental mode:[/bold cyan] "
+        f"processing {len(new_commits)} new commits"
+    )
+
+    # Stage 2: Sample NEW commits only (no caching — this is a delta)
+    console.rule("[bold blue]Stage 2: Sample (new commits)")
+    new_clusters = sample(new_commits, config, use_cache=False)
+    if not new_clusters:
+        console.print("[dim]No new clusters to analyze[/dim]")
+        # Load existing articles and just re-serve them
+        existing_articles = _load_articles(config.articles_path())
+        lint_report = lint(existing_articles, config)
+        write_wiki(existing_articles, lint_report, config)
+        return
+
+    # Stage 3: Extract from new clusters only (no caching)
+    console.rule("[bold blue]Stage 3: Extract (new observations)")
+    new_extractions = extract(new_clusters, config, use_cache=False)
+    new_obs_count = sum(len(e.observations) for e in new_extractions)
+    if new_obs_count == 0 and not config.dry_run:
+        console.print("[yellow]No new observations extracted — keeping existing wiki[/yellow]")
+        existing_articles = _load_articles(config.articles_path())
+        lint_report = lint(existing_articles, config)
+        write_wiki(existing_articles, lint_report, config)
+        return
+
+    # Merge new extractions into existing ones for the cache
+    if config.extractions_path().exists():
+        existing_extractions = _load_extractions(config.extractions_path())
+        merged_extractions = merge_extractions(existing_extractions, new_extractions)
+        # Update extractions cache
+        import json
+        with open(config.extractions_path(), "w") as f:
+            json.dump([e.model_dump(mode="json") for e in merged_extractions], f, indent=2)
+
+    # Stage 4: Evolve existing articles with new observations
+    console.rule("[bold blue]Stage 4: Evolve Wiki")
+    existing_articles = _load_articles(config.articles_path())
+    articles = evolve_wiki(existing_articles, new_extractions, config)
+    if not articles and not config.dry_run:
+        console.print("[red]Error: Evolution produced no articles.[/red]")
+        return
+
+    # Invalidate stale caches (samples and lint are now stale)
+    for stale in [config.samples_path(), config.lint_path()]:
+        if stale.exists():
+            stale.unlink()
+
+    # Stage 5: Lint
+    console.rule("[bold blue]Stage 5: Lint")
+    lint_report = lint(articles, config)
+
+    # Write wiki
+    console.rule("[bold blue]Writing Wiki")
+    wiki_path = write_wiki(articles, lint_report, config)
+
+    console.print()
+    console.print(Panel(
+        f"[bold green]Wiki evolved![/bold green]\n"
+        f"Incorporated [cyan]{len(new_commits)}[/cyan] new commits\n"
+        f"Wiki written to [cyan]{wiki_path}[/cyan]",
         border_style="green",
     ))

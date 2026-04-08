@@ -20,6 +20,7 @@ class GitStyleConfig(BaseModel):
     until: Optional[str] = None
     llm_model: str = "claude-sonnet-4-20250514"
     dry_run: bool = False
+    fresh: bool = False  # --fresh forces a full re-run, ignoring cache
 
     def commits_path(self) -> Path:
         return self.cache_dir / "commits.jsonl"

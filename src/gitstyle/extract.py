@@ -1,4 +1,4 @@
-"""Stage 3: Extract — LLM pass per cluster → structured style observations."""
+"""Stage 3: Extract — LLM pass per cluster -> structured style observations."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ For each observation provide:
 - dimension: one of the 9 dimensions above
 - claim: a specific, concrete observation about the developer's style
 - evidence: list of commit SHAs that support this claim
-- confidence: 0.0–1.0 (how confident given the evidence)
+- confidence: 0.0-1.0 (how confident given the evidence)
 - language: the programming language (if language-specific)
 
 Return valid JSON: {"observations": [...]}\
@@ -44,12 +44,13 @@ Return valid JSON: {"observations": [...]}\
 def extract(
     clusters: list[SampledCluster],
     config: GitStyleConfig,
+    use_cache: bool = True,
 ) -> list[ClusterExtraction]:
     """Run LLM extraction on each cluster."""
     config.ensure_cache_dir()
     cache = config.extractions_path()
 
-    if cache.exists():
+    if use_cache and cache.exists():
         console.print(f"[dim]Using cached extractions from {cache}[/dim]")
         return _load_extractions(cache)
 
@@ -100,12 +101,49 @@ def extract(
         console.print("[yellow]  Warning: 0 observations extracted (not caching empty result)[/yellow]")
         return extractions
 
-    # Cache
-    with open(cache, "w") as f:
-        json.dump([e.model_dump(mode="json") for e in extractions], f, indent=2)
+    # Cache (only when caching is enabled)
+    if use_cache:
+        with open(cache, "w") as f:
+            json.dump([e.model_dump(mode="json") for e in extractions], f, indent=2)
 
     console.print(f"  Extracted [green]{total_obs}[/green] observations")
     return extractions
+
+
+def merge_extractions(
+    existing: list[ClusterExtraction],
+    new: list[ClusterExtraction],
+) -> list[ClusterExtraction]:
+    """Merge new extractions into existing ones.
+
+    For each (repo, lang) pair:
+    - If new has extractions, combine observations from both
+    - If only existing has extractions, keep as-is
+    """
+    merged: dict[tuple[str, str], ClusterExtraction] = {}
+
+    for ext in existing:
+        key = (ext.repo, ext.language)
+        merged[key] = ext
+
+    for ext in new:
+        key = (ext.repo, ext.language)
+        if key in merged:
+            # Combine observations — deduplicate by claim text
+            existing_claims = {o.claim for o in merged[key].observations}
+            combined_obs = list(merged[key].observations)
+            for o in ext.observations:
+                if o.claim not in existing_claims:
+                    combined_obs.append(o)
+            merged[key] = ClusterExtraction(
+                repo=ext.repo,
+                language=ext.language,
+                observations=combined_obs,
+            )
+        else:
+            merged[key] = ext
+
+    return list(merged.values())
 
 
 def _build_prompt(cluster: SampledCluster) -> str:

@@ -114,3 +114,13 @@ class LintIssue(BaseModel):
 class LintReport(BaseModel):
     issues: list[LintIssue] = Field(default_factory=list)
     passed: bool = True
+
+
+# ---------------------------------------------------------------------------
+# Fetch result (supports incremental)
+# ---------------------------------------------------------------------------
+
+class FetchResult(BaseModel):
+    all_commits: list[RawCommit]
+    new_commits: list[RawCommit]
+    is_incremental: bool = False

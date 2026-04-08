@@ -210,8 +210,10 @@ def test_fetch_loads_from_cache():
             f.write(commit.model_dump_json() + "\n")
 
         result = fetch(config)
-        assert len(result) == 1
-        assert result[0].sha == "cached_sha"
+        assert len(result.all_commits) == 1
+        assert result.all_commits[0].sha == "cached_sha"
+        # With a fake token, incremental fetch fails gracefully
+        assert result.is_incremental is True
 
 
 # ---------------------------------------------------------------------------

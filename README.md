@@ -57,6 +57,23 @@ That's it. The tool runs a 5-stage pipeline:
 4. **Compile** — LLM synthesizes observations into wiki articles
 5. **Lint** — LLM health check for contradictions and weak evidence
 
+### Incremental Updates
+
+Re-run `gitstyle run` at any time — the wiki **evolves** with new commits:
+
+```bash
+# First run: full analysis
+gitstyle run karpathy
+
+# Later: only fetches new commits, evolves existing articles
+gitstyle run karpathy
+
+# Force a full rebuild from scratch
+gitstyle run karpathy --fresh
+```
+
+The incremental pipeline only fetches commits since the last run, extracts observations from new data only, and uses the LLM to evolve existing articles (preserving valid insights, incorporating new patterns, noting contradictions). This saves API calls, LLM costs, and time.
+
 ## Output Format
 
 gitstyle produces a directory of markdown files with YAML frontmatter, designed to be Obsidian-compatible and agent-readable:
@@ -205,6 +222,7 @@ gitstyle --version
 | `--model, -m` | `claude-sonnet-4-20250514` | LLM model |
 | `--token, -t` | `$GITHUB_TOKEN` | GitHub token |
 | `--dry-run` | `false` | Show what would happen without LLM calls |
+| `--fresh` | `false` | Force full rebuild, ignoring cache |
 
 ### Options for `serve`
 
@@ -224,9 +242,9 @@ gitstyle --version
 
 If no API credentials are set, gitstyle will show a clear error before starting the pipeline.
 
-## Caching
+## Caching & Incremental Runs
 
-gitstyle caches intermediate data to avoid redundant API calls and LLM invocations:
+gitstyle caches intermediate data in `.gitstyle/`:
 
 ```
 .gitstyle/
@@ -237,7 +255,11 @@ gitstyle caches intermediate data to avoid redundant API calls and LLM invocatio
   lint.json           # Lint report
 ```
 
-Delete `.gitstyle/` to start fresh (`gitstyle clean`), or delete individual cache files to re-run specific stages.
+When you re-run `gitstyle run`, it automatically detects cached data and runs incrementally — only fetching new commits and evolving existing articles. This means your wiki grows richer over time without redundant API calls or LLM costs.
+
+- `gitstyle run <user>` — incremental (default when cache exists)
+- `gitstyle run <user> --fresh` — full rebuild from scratch
+- `gitstyle clean` — delete all cached data
 
 ## Examples
 

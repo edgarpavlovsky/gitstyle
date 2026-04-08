@@ -1,4 +1,4 @@
-"""Stage 2: Sample — group commits by repo × language, sample representative commits."""
+"""Stage 2: Sample — group commits by repo x language, sample representative commits."""
 
 from __future__ import annotations
 
@@ -15,18 +15,44 @@ from gitstyle.models import RawCommit, SampledCluster
 console = Console()
 
 
-def sample(commits: list[RawCommit], config: GitStyleConfig) -> list[SampledCluster]:
-    """Group commits by repo × language and sample representative ones."""
+def sample(
+    commits: list[RawCommit],
+    config: GitStyleConfig,
+    use_cache: bool = True,
+) -> list[SampledCluster]:
+    """Group commits by repo x language and sample representative ones."""
     config.ensure_cache_dir()
     cache = config.samples_path()
 
-    if cache.exists():
+    if use_cache and cache.exists():
         console.print(f"[dim]Using cached samples from {cache}[/dim]")
         return _load_samples(cache)
 
     console.print("[bold]Sampling representative commits...[/bold]")
 
-    # Group by repo × language
+    clusters = _build_clusters(commits, config.samples_per_group)
+
+    if not clusters:
+        console.print("[yellow]  Warning: 0 clusters sampled (not caching empty result)[/yellow]")
+        return clusters
+
+    # Cache (only when caching is enabled)
+    if use_cache:
+        with open(cache, "w") as f:
+            json.dump([c.model_dump(mode="json") for c in clusters], f, indent=2, default=str)
+
+    total_sampled = sum(len(c.commits) for c in clusters)
+    console.print(
+        f"  [green]{len(clusters)}[/green] clusters, "
+        f"[green]{total_sampled}[/green] sampled commits"
+    )
+    return clusters
+
+
+def _build_clusters(
+    commits: list[RawCommit], samples_per_group: int,
+) -> list[SampledCluster]:
+    """Group commits by repo x language and sample."""
     groups: dict[tuple[str, str], list[RawCommit]] = defaultdict(list)
     for c in commits:
         if c.languages:
@@ -38,27 +64,13 @@ def sample(commits: list[RawCommit], config: GitStyleConfig) -> list[SampledClus
     clusters: list[SampledCluster] = []
     for (repo, lang), group_commits in groups.items():
         total = len(group_commits)
-        sampled = _sample_group(group_commits, config.samples_per_group)
+        sampled = _sample_group(group_commits, samples_per_group)
         clusters.append(SampledCluster(
             repo=repo,
             language=lang,
             commits=sampled,
             total_in_group=total,
         ))
-
-    if not clusters:
-        console.print("[yellow]  Warning: 0 clusters sampled (not caching empty result)[/yellow]")
-        return clusters
-
-    # Cache
-    with open(cache, "w") as f:
-        json.dump([c.model_dump(mode="json") for c in clusters], f, indent=2, default=str)
-
-    total_sampled = sum(len(c.commits) for c in clusters)
-    console.print(
-        f"  [green]{len(clusters)}[/green] clusters, "
-        f"[green]{total_sampled}[/green] sampled commits"
-    )
     return clusters
 
 
