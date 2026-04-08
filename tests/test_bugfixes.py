@@ -396,6 +396,103 @@ class TestFixWikilinks:
     def test_empty_article_list(self):
         assert _fix_wikilinks([]) == []
 
+    def test_strips_self_referential_wikilinks_from_list(self):
+        """Articles should not link to themselves."""
+        articles = [
+            _make_article(
+                "code-structure",
+                wikilinks=["code-structure", "naming-conventions"],
+            ),
+            _make_article("naming-conventions"),
+        ]
+        fixed = _fix_wikilinks(articles)
+        assert "code-structure" not in fixed[0].wikilinks
+        assert "naming-conventions" in fixed[0].wikilinks
+
+    def test_strips_self_referential_wikilinks_from_content(self):
+        """Self-referential [[wikilinks]] in content should become plain text."""
+        articles = [
+            _make_article(
+                "python",
+                content="See [[python]] for more about [[naming-conventions]].",
+            ),
+            _make_article("naming-conventions"),
+        ]
+        fixed = _fix_wikilinks(articles)
+        assert "[[python]]" not in fixed[0].content
+        assert "python" in fixed[0].content  # plain text preserved
+        assert "[[naming-conventions]]" in fixed[0].content  # valid link kept
+
+    def test_handles_pipe_syntax_wikilinks(self):
+        """[[slug|display text]] format should be handled correctly."""
+        articles = [
+            _make_article(
+                "testing",
+                content="Related to [[commit-hygiene|commit messages]] and [[nonexistent|fake]].",
+            ),
+            _make_article("commit-hygiene"),
+        ]
+        fixed = _fix_wikilinks(articles)
+        assert "[[commit-hygiene|commit messages]]" in fixed[0].content
+        assert "[[nonexistent" not in fixed[0].content
+        assert "fake" in fixed[0].content  # display text preserved
+
+    def test_normalizes_slug_with_spaces(self):
+        """Wikilinks with spaces in slug should be normalized to hyphens."""
+        articles = [
+            _make_article(
+                "testing",
+                content="See [[code structure]] for more.",
+            ),
+            _make_article("code-structure"),
+        ]
+        fixed = _fix_wikilinks(articles)
+        assert "[[code-structure]]" in fixed[0].content
+
+    def test_self_referential_pipe_syntax(self):
+        """Self-referential [[slug|display]] should become just display text."""
+        articles = [
+            _make_article(
+                "python",
+                content="This is about [[python|Python patterns]].",
+            ),
+            _make_article("naming-conventions"),
+        ]
+        fixed = _fix_wikilinks(articles)
+        assert "[[python" not in fixed[0].content
+        assert "Python patterns" in fixed[0].content
+
+
+# ---------------------------------------------------------------------------
+# Truncation retry
+# ---------------------------------------------------------------------------
+
+class TestTruncationRetry:
+    @patch.object(LLMClient, '__init__', lambda self, **kwargs: None)
+    def test_retries_on_max_tokens_truncation(self):
+        """When stop_reason is max_tokens, should retry with doubled limit."""
+        client = LLMClient()
+        client.model = "test"
+        client._last_stop_reason = "end_turn"
+        call_count = [0]
+        captured_max_tokens = []
+
+        def mock_complete(system, prompt, max_tokens, temperature):
+            call_count[0] += 1
+            captured_max_tokens.append(max_tokens)
+            if call_count[0] == 1:
+                client._last_stop_reason = "max_tokens"
+                return '{"truncated": true'  # incomplete JSON
+            client._last_stop_reason = "end_turn"
+            return '{"complete": true}'
+
+        with patch.object(client, 'complete', side_effect=mock_complete):
+            result = client.complete_json("system", "prompt")
+
+        assert result == {"complete": True}
+        assert call_count[0] == 2
+        assert captured_max_tokens[1] > captured_max_tokens[0]
+
 
 # ---------------------------------------------------------------------------
 # Compile prompts: valid slugs passed
@@ -528,20 +625,22 @@ class TestCompleteJsonRetry:
         assert "original prompt" in prompts_seen[1]
 
     @patch.object(LLMClient, '__init__', lambda self, **kwargs: None)
-    def test_default_max_tokens_is_16384(self):
-        """Verify max_tokens default was increased from 8192 to 16384."""
+    def test_default_max_tokens_is_32768(self):
+        """Verify max_tokens default was increased to 32768."""
         client = LLMClient()
         client.model = "test"
+        client._last_stop_reason = "end_turn"
         captured_max_tokens = []
 
         def mock_complete(system, prompt, max_tokens, temperature):
             captured_max_tokens.append(max_tokens)
+            client._last_stop_reason = "end_turn"
             return '{"ok": true}'
 
         with patch.object(client, 'complete', side_effect=mock_complete):
             client.complete_json("system", "prompt")
 
-        assert captured_max_tokens[0] == 16384
+        assert captured_max_tokens[0] == 32768
 
 
 # ---------------------------------------------------------------------------

@@ -33,6 +33,8 @@ Requirements:
 - Include a confidence assessment
 - Be specific and concrete — avoid vague generalities
 - If observations conflict, note the contradiction and which has stronger evidence
+- Do NOT link an article to itself (no self-referential wikilinks)
+- Complete all sentences fully — never end an article mid-sentence
 
 Return valid JSON:
 {
@@ -50,6 +52,8 @@ Write about the developer's idiomatic usage, patterns, and preferences specific 
 this programming language. Cross-reference universal style dimensions with `[[wikilinks]]`.
 
 Cite commit SHAs inline. Be specific.
+Do NOT link an article to itself (no self-referential wikilinks).
+Complete all sentences fully — never end an article mid-sentence.
 
 Return valid JSON:
 {
@@ -487,18 +491,36 @@ def _build_language_prompt(
 
 
 def _fix_wikilinks(articles: list[WikiArticle]) -> list[WikiArticle]:
-    """Post-process: strip wikilinks that point to non-existent articles."""
+    """Post-process: strip wikilinks that are broken, self-referential, or malformed."""
     valid_slugs = {a.slug for a in articles}
     for article in articles:
-        # Fix wikilinks list
-        article.wikilinks = [w for w in article.wikilinks if w in valid_slugs]
-        # Fix [[wikilinks]] in content — replace broken ones with plain text
-        def _replace_link(m: re.Match) -> str:
-            slug = m.group(1)
-            if slug in valid_slugs:
-                return m.group(0)  # keep valid link
-            # Strip brackets, keep the display text
-            return slug.replace("-", " ")
+        # Fix wikilinks list — remove broken and self-referential links
+        article.wikilinks = [
+            w for w in article.wikilinks
+            if w in valid_slugs and w != article.slug
+        ]
+        # Fix [[wikilinks]] in content — handle both [[slug]] and [[slug|display]] formats
+        def _replace_link(m: re.Match, _article_slug: str = article.slug) -> str:
+            inner = m.group(1)
+            # Parse pipe syntax: [[slug|display text]]
+            if "|" in inner:
+                slug = inner.split("|", 1)[0].strip()
+                display = inner.split("|", 1)[1].strip()
+            else:
+                slug = inner.strip()
+                display = slug.replace("-", " ")
+            # Normalize slug (spaces to hyphens, lowercase)
+            normalized = slug.lower().replace(" ", "-")
+            # Remove self-referential links
+            if normalized == _article_slug:
+                return display
+            # Remove links to non-existent articles
+            if normalized not in valid_slugs:
+                return display
+            # Valid link — normalize the slug format
+            if "|" in inner:
+                return f"[[{normalized}|{display}]]"
+            return f"[[{normalized}]]"
         article.content = re.sub(r'\[\[([^\]]+)\]\]', _replace_link, article.content)
     return articles
 

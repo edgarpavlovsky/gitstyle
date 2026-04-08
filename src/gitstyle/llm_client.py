@@ -54,20 +54,29 @@ class LLMClient:
             messages=[{"role": "user", "content": prompt}],
         ) as stream:
             message = stream.get_final_message()
+        self._last_stop_reason = message.stop_reason
         return message.content[0].text
 
     def complete_json(
         self,
         system: str,
         prompt: str,
-        max_tokens: int = 16384,
+        max_tokens: int = 32768,
         temperature: float = 0.2,
         retries: int = 1,
     ) -> dict | list:
-        """Send a prompt and parse the response as JSON. Retries on parse failure."""
+        """Send a prompt and parse the response as JSON. Retries on parse failure.
+
+        If the response is truncated (hit max_tokens), retries with higher limit.
+        """
         last_error = None
+        current_max_tokens = max_tokens
         for attempt in range(retries + 1):
-            text = self.complete(system, prompt, max_tokens, temperature)
+            text = self.complete(system, prompt, current_max_tokens, temperature)
+            # Detect truncation — if the model hit max_tokens, the JSON is incomplete
+            if getattr(self, "_last_stop_reason", None) == "max_tokens" and attempt < retries:
+                current_max_tokens = min(current_max_tokens * 2, 65536)
+                continue
             extracted = self._extract_json_text(text)
             try:
                 return json.loads(extracted)
