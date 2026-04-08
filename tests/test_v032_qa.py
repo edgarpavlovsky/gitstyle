@@ -55,7 +55,7 @@ class TestViewerGlassmorphism:
         assert "-webkit-backdrop-filter:blur(" in VIEWER_HTML or "-webkit-backdrop-filter: blur(" in VIEWER_HTML
 
     def test_semi_transparent_bg(self):
-        assert "rgba(22,27,34," in VIEWER_HTML or "rgba(22, 27, 34," in VIEWER_HTML
+        assert "rgba(15, 20, 40," in VIEWER_HTML or "rgba(22,27,34," in VIEWER_HTML or "rgba(22, 27, 34," in VIEWER_HTML
 
 
 class TestViewerGraphFeatures:
@@ -80,7 +80,7 @@ class TestViewerGraphFeatures:
         assert "animateParticles" in VIEWER_HTML
 
     def test_particle_circles(self):
-        assert "particleCircles" in VIEWER_HTML
+        assert "particleCircles" in VIEWER_HTML or "particleSelection" in VIEWER_HTML
 
     def test_force_simulation(self):
         assert "forceSimulation" in VIEWER_HTML
@@ -106,7 +106,7 @@ class TestViewerStyling:
 
     def test_dark_theme_bg(self):
         """Background should be dark."""
-        assert "#0d1117" in VIEWER_HTML or "#080c18" in VIEWER_HTML
+        assert "#0d1117" in VIEWER_HTML or "#080c18" in VIEWER_HTML or "#0a0e1a" in VIEWER_HTML
 
     def test_dot_grid_pattern(self):
         assert "radial-gradient" in VIEWER_HTML
@@ -121,8 +121,9 @@ class TestViewerStyling:
     def test_scrollbar_styling(self):
         assert "webkit-scrollbar" in VIEWER_HTML
 
-    def test_tooltip_styling(self):
-        assert "graph-tooltip" in VIEWER_HTML
+    def test_hover_interaction(self):
+        # Vue rewrite uses focus+context dimming instead of tooltip overlay
+        assert "graph-tooltip" in VIEWER_HTML or "mouseover" in VIEWER_HTML
 
 
 class TestViewerFunctionality:
@@ -138,10 +139,12 @@ class TestViewerFunctionality:
         assert "/api/graph" in VIEWER_HTML
 
     def test_sidebar_render(self):
-        assert "renderSidebar" in VIEWER_HTML
+        # Vue rewrite uses groupedFiles + template, no renderSidebar function
+        assert "renderSidebar" in VIEWER_HTML or "groupedFiles" in VIEWER_HTML
 
     def test_article_render(self):
-        assert "renderArticle" in VIEWER_HTML
+        # Vue rewrite uses selectArticle + renderedArticle computed
+        assert "renderArticle" in VIEWER_HTML or "selectArticle" in VIEWER_HTML
 
     def test_graph_render(self):
         assert "renderGraph" in VIEWER_HTML
@@ -178,10 +181,11 @@ class TestViewerFunctionality:
         assert "catch" in VIEWER_HTML
 
     def test_cdn_error_fallback(self):
-        assert "cdn-error" in VIEWER_HTML
+        assert "cdn-error" in VIEWER_HTML or "cdnError" in VIEWER_HTML or "CDN Unreachable" in VIEWER_HTML
 
     def test_tab_switching(self):
-        assert "data-view" in VIEWER_HTML
+        # Vue rewrite uses v-if/v-show for view switching, no data-view tabs
+        assert "data-view" in VIEWER_HTML or "selectedArticle" in VIEWER_HTML
 
     def test_index_node_pulse(self):
         """Index nodes should have pulsing animation."""
@@ -194,7 +198,7 @@ class TestViewerFunctionality:
 
     def test_node_click_navigation(self):
         """Clicking a node should navigate to its article."""
-        assert "navigateTo" in VIEWER_HTML
+        assert "navigateTo" in VIEWER_HTML or "selectArticle" in VIEWER_HTML
 
 
 class TestViewerNodeClickEffects:

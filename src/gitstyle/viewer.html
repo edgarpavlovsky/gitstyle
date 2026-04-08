@@ -4,730 +4,747 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gitstyle — Engineering Style Wiki</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%237c5cfc'/%3E%3Cstop offset='100%25' stop-color='%2300e676'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='15' fill='%230d1117' stroke='url(%23g)' stroke-width='2'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Inter,system-ui,sans-serif' font-weight='700' font-size='18' fill='url(%23g)'%3Eg%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%237c5cfc'/%3E%3Cstop offset='100%25' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='15' fill='%230a0e1a' stroke='url(%23g)' stroke-width='2'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Inter,system-ui,sans-serif' font-weight='700' font-size='18' fill='url(%23g)'%3Eg%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Tailwind CSS Play CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        cosmos: {
+          bg: '#0a0e1a',
+          surface: '#0f1528',
+          panel: 'rgba(15, 20, 40, 0.88)',
+          border: 'rgba(255, 255, 255, 0.06)',
+          'border-hover': 'rgba(255, 255, 255, 0.12)',
+        },
+        accent: {
+          primary: '#7c5cfc',
+          secondary: '#22d3ee',
+          warm: '#f59e0b',
+          emerald: '#10b981',
+          pink: '#f472b6',
+        },
+        text: {
+          primary: '#e2e8f0',
+          secondary: '#94a3b8',
+          muted: '#475569',
+        }
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+      },
+    }
+  }
+}
+</script>
+
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;
-  --fg:#e6edf3;--fg2:#8b949e;--fg3:#484f58;
-  --accent:#7c5cfc;--accent2:#00e676;
-  --gold:#f0a500;--blue:#7c5cfc;--green:#00e676;--gray:#607d8b;
-  --border:#30363d;--radius:6px;
-}
-html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);overflow:hidden}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
+  /* Base resets and non-Tailwind essentials */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
 
-/* Layout */
-#app{display:flex;height:100vh}
-#sidebar{
-  width:260px;min-width:260px;
-  background:rgba(22,27,34,0.85);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  border-right:1px solid rgba(124,92,252,0.15);
-  display:flex;flex-direction:column;overflow:hidden;
-  position:relative;z-index:10;
-}
-#sidebar::before{
-  content:'';position:absolute;top:0;left:0;bottom:0;width:1px;
-  background:linear-gradient(180deg,rgba(124,92,252,0.6) 0%,rgba(124,92,252,0.1) 50%,rgba(0,230,118,0.3) 100%);
-  z-index:1;
-}
-#sidebar-header{padding:16px;position:relative}
-#sidebar-header::after{
-  content:'';position:absolute;bottom:0;left:16px;right:16px;height:1px;
-  background:linear-gradient(90deg,rgba(124,92,252,0.5),rgba(124,92,252,0.05));
-}
-#sidebar-header h1{font-size:14px;font-weight:700;color:var(--fg);letter-spacing:0.5px}
-#sidebar-header .subtitle{font-size:11px;color:var(--fg2);margin-top:2px;font-weight:400}
-#sidebar-nav{flex:1;overflow-y:auto;padding:8px 0}
-.nav-section{padding:10px 16px 4px;font-size:10px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:1px}
-.nav-item{
-  display:flex;align-items:center;gap:8px;
-  padding:7px 16px 7px 20px;font-size:13px;font-weight:400;color:var(--fg2);
-  cursor:pointer;border-left:2px solid transparent;
-  transition:all 0.2s ease;position:relative;
-}
-.nav-item::before{
-  content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0;
-  background:var(--gray);transition:all 0.2s ease;
-}
-.nav-item[data-cat="index"]::before{background:var(--gold)}
-.nav-item[data-cat="dimension"]::before,
-.nav-item[data-cat="style"]::before{background:var(--blue)}
-.nav-item[data-cat="language"]::before{background:var(--green)}
-.nav-item[data-cat="meta"]::before{background:var(--gray)}
-.nav-item:hover{color:var(--fg);background:rgba(124,92,252,0.08);padding-left:24px}
-.nav-item.active{
-  color:var(--accent);border-left-color:var(--accent);
-  background:rgba(124,92,252,0.12);
-  border-top-left-radius:0;border-bottom-left-radius:0;
-  border-top-right-radius:6px;border-bottom-right-radius:6px;
-  font-weight:500;
-}
-#sidebar-footer{padding:12px 16px;border-top:1px solid rgba(48,54,61,0.5);font-size:11px;color:var(--fg3);font-weight:400}
+  /* Dot grid background for graph canvas */
+  .graph-canvas {
+    background:
+      radial-gradient(ellipse at 50% 50%, #0f1528 0%, #0a0e1a 70%),
+      radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 100% 100%, 30px 30px;
+  }
 
-/* Main area */
-#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-#toolbar{
-  height:48px;display:flex;align-items:center;padding:0 16px;
-  border-bottom:1px solid var(--border);
-  background:rgba(22,27,34,0.7);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  gap:8px;
-}
-.tab{
-  padding:6px 16px;font-size:13px;font-weight:500;color:var(--fg2);
-  cursor:pointer;border-radius:20px;
-  transition:all 0.2s ease;position:relative;
-}
-.tab:hover{color:var(--fg);background:rgba(124,92,252,0.1)}
-.tab.active{
-  color:var(--fg);background:rgba(124,92,252,0.15);font-weight:600;
-  box-shadow:0 0 12px rgba(124,92,252,0.2);
-}
-.tab.active::after{
-  content:'';position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);
-  width:60%;height:2px;border-radius:1px;
-  background:linear-gradient(90deg,transparent,var(--accent),transparent);
-}
-#breadcrumb{margin-left:auto;font-size:12px;color:var(--fg3);font-weight:400}
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
 
-#content{flex:1;overflow:hidden;position:relative}
-#graph-view,#article-view{position:absolute;inset:0;overflow:hidden}
-#article-view{overflow-y:auto;padding:32px 48px;display:none;color:var(--fg);background:var(--bg)}
-#graph-view svg{width:100%;height:100%}
-#graph-view{
-  background:
-    radial-gradient(ellipse at 50% 50%, #0f1528 0%, #0a0e1a 70%),
-    radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px);
-  background-size: 100% 100%, 30px 30px;
-}
+  /* Index node pulse animation */
+  @keyframes indexPulse {
+    0%, 100% { filter: url(#glow) drop-shadow(0 0 6px rgba(245,158,11,0.6)); }
+    50% { filter: url(#glow) drop-shadow(0 0 14px rgba(245,158,11,0.9)); }
+  }
+  .index-node { animation: indexPulse 2.5s ease-in-out infinite; }
 
-/* Article markdown styles */
-.article-meta{
-  margin-bottom:24px;padding:20px;
-  border-radius:8px;
-  background:
-    linear-gradient(var(--bg2),var(--bg2)) padding-box,
-    linear-gradient(135deg,rgba(124,92,252,0.5),rgba(88,166,255,0.3)) border-box;
-  border:1px solid transparent;
-}
-.article-meta h1{font-size:24px;margin-bottom:10px;font-weight:700}
-.badge{
-  display:inline-block;padding:4px 12px;font-size:11px;
-  border-radius:20px;font-weight:600;margin-right:6px;
-  transition:all 0.2s ease;
-}
-.badge-high{background:rgba(0,230,118,0.12);color:var(--green);box-shadow:0 0 8px rgba(0,230,118,0.15)}
-.badge-medium{background:rgba(240,165,0,0.12);color:var(--gold);box-shadow:0 0 8px rgba(240,165,0,0.15)}
-.badge-low{background:rgba(248,81,73,.12);color:#f85149;box-shadow:0 0 8px rgba(248,81,73,0.15)}
-.badge-category{background:rgba(124,92,252,0.12);color:var(--accent);box-shadow:0 0 8px rgba(124,92,252,0.15)}
-.meta-row{font-size:12px;color:var(--fg2);margin-top:6px}
+  /* Article content typography */
+  .article-content h1 { font-size: 1.25rem; font-weight: 600; color: #7c5cfc; margin-top: 2rem; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .article-content h2 { font-size: 1.125rem; font-weight: 500; color: #e2e8f0; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  .article-content h3 { font-size: 1rem; font-weight: 500; color: #e2e8f0; margin-top: 1rem; margin-bottom: 0.5rem; }
+  .article-content p { margin-bottom: 1rem; }
+  .article-content ul, .article-content ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+  .article-content li { margin-bottom: 0.25rem; }
+  .article-content code { background: rgba(0,0,0,0.3); color: #22d3ee; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.8125rem; font-family: 'JetBrains Mono', monospace; }
+  .article-content pre { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); border-radius: 0.75rem; padding: 1rem; overflow-x: auto; margin: 1rem 0; }
+  .article-content pre code { background: transparent; padding: 0; color: #e2e8f0; }
+  .article-content blockquote { border-left: 2px solid rgba(124,92,252,0.4); padding-left: 1rem; color: #94a3b8; font-style: italic; margin: 1rem 0; }
+  .article-content table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+  .article-content th, .article-content td { padding: 0.5rem 0.75rem; border: 1px solid rgba(255,255,255,0.06); text-align: left; }
+  .article-content th { background: rgba(15,21,40,0.5); font-weight: 600; }
+  .article-content a { color: #7c5cfc; }
+  .article-content a:hover { text-decoration: underline; }
 
-/* Markdown rendered content */
-.md-body{line-height:1.8;font-size:16px;max-width:800px;margin:0 auto}
-.md-body h1{font-size:22px;margin:28px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border);font-weight:700}
-.md-body h2{font-size:18px;margin:24px 0 10px;font-weight:600}
-.md-body h3{font-size:15px;margin:20px 0 8px;font-weight:600}
-.md-body p{margin:12px 0}
-.md-body ul,.md-body ol{margin:12px 0;padding-left:24px}
-.md-body li{margin:4px 0}
-.md-body code{background:var(--bg3);padding:2px 6px;border-radius:4px;font-size:13px}
-.md-body pre{
-  background:var(--bg2);
-  border:1px solid rgba(124,92,252,0.15);
-  border-radius:8px;padding:16px;overflow-x:auto;margin:16px 0;
-  box-shadow:0 0 16px rgba(124,92,252,0.05);
-}
-.md-body pre code{background:none;padding:0}
-.md-body blockquote{border-left:3px solid var(--accent);padding-left:16px;color:var(--fg2);margin:12px 0}
-.md-body table{border-collapse:collapse;margin:12px 0;width:100%}
-.md-body th,.md-body td{padding:8px 12px;border:1px solid var(--border);text-align:left}
-.md-body th{background:var(--bg2);font-weight:600}
-.md-body a{color:var(--accent)}
+  /* Wikilink pills */
+  .wikilink {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.125rem 0.5rem; border-radius: 1rem;
+    background: rgba(124,92,252,0.1); color: #7c5cfc;
+    font-size: 0.875rem; font-weight: 500;
+    border: 1px solid rgba(124,92,252,0.2);
+    text-decoration: none; cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .wikilink:hover { background: rgba(124,92,252,0.2); text-decoration: none; border-color: rgba(124,92,252,0.4); }
 
-/* Graph tooltip */
-.graph-tooltip{
-  position:absolute;padding:10px 16px;
-  background:rgba(22,27,34,0.9);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  border:1px solid rgba(124,92,252,0.25);
-  border-radius:8px;font-size:13px;
-  pointer-events:none;opacity:0;
-  transition:opacity 0.2s ease;z-index:100;
-  box-shadow:0 4px 20px rgba(0,0,0,0.4),0 0 12px rgba(124,92,252,0.1);
-}
-
-/* CDN error */
-#cdn-error{display:none;position:absolute;inset:0;background:var(--bg);display:none;align-items:center;justify-content:center;flex-direction:column;padding:48px;text-align:center}
-#cdn-error h2{color:var(--gold);margin-bottom:12px}
-#cdn-error p{color:var(--fg2);max-width:480px;line-height:1.6}
-
-/* Scrollbar */
-::-webkit-scrollbar{width:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
-::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.18)}
-
-/* Graph node hover scale */
-#graph-view circle{transition:transform 0.2s ease,filter 0.2s ease}
-
-/* Index node pulsing glow */
-@keyframes indexPulse{
-  0%,100%{filter:url(#glow) drop-shadow(0 0 6px rgba(240,165,0,0.6))}
-  50%{filter:url(#glow) drop-shadow(0 0 14px rgba(240,165,0,0.9))}
-}
-.index-node{animation:indexPulse 2.5s ease-in-out infinite}
-
-/* View transitions removed — simple display toggle is more reliable across browsers */
+  /* Slide transitions */
+  .slide-right-enter-active, .slide-right-leave-active {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .slide-right-enter-from, .slide-right-leave-to {
+    transform: translateX(100%);
+  }
 </style>
+
+<!-- highlight.js theme -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
 </head>
-<body>
+
+<body class="bg-cosmos-bg font-sans text-text-primary">
+
 <div id="app">
-  <div id="sidebar">
-    <div id="sidebar-header">
-      <h1>gitstyle</h1>
-      <div class="subtitle">Engineering Style Wiki</div>
+  <!-- CDN Error Overlay -->
+  <div v-if="cdnError" class="fixed inset-0 z-50 flex items-center justify-center bg-cosmos-bg p-12 text-center">
+    <div>
+      <h2 class="text-2xl font-bold text-accent-warm mb-3">CDN Unreachable</h2>
+      <p class="text-text-secondary max-w-md leading-relaxed">This viewer requires external libraries (D3.js, marked.js, highlight.js) loaded from CDN. Please check your internet connection and reload.</p>
     </div>
-    <div id="sidebar-nav"></div>
-    <div id="sidebar-footer">Powered by gitstyle</div>
   </div>
-  <div id="main">
-    <div id="toolbar">
-      <div class="tab active" data-view="graph">Graph</div>
-      <div class="tab" data-view="article">Reader</div>
-      <div id="breadcrumb"></div>
+
+  <!-- Main Layout: full-bleed graph with floating overlays -->
+  <div v-else class="h-screen w-screen relative overflow-hidden">
+
+    <!-- Full-bleed Graph Canvas -->
+    <div ref="graphCanvas" class="absolute inset-0 graph-canvas" @click="onCanvasClick"></div>
+
+    <!-- Floating Nav Panel (left) -->
+    <div class="fixed left-4 top-4 bottom-4 w-72 z-10 flex flex-col rounded-2xl overflow-hidden"
+         style="background: rgba(15, 20, 40, 0.88); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.06); box-shadow: 4px 0 24px rgba(0,0,0,0.3);">
+
+      <!-- Nav Header -->
+      <div class="px-5 pt-5 pb-4 border-b border-cosmos-border">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold"
+               style="background: linear-gradient(135deg, #7c5cfc, #22d3ee); color: #0a0e1a;">g</div>
+          <div>
+            <h1 class="text-sm font-bold text-text-primary tracking-wide">gitstyle</h1>
+            <p class="text-[11px] text-text-muted font-normal">Engineering Style Wiki</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nav Items -->
+      <div class="flex-1 overflow-y-auto py-2">
+        <template v-for="(group, key) in groupedFiles" :key="key">
+          <div v-if="group.length > 0"
+               class="px-5 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] flex items-center justify-between"
+               :class="sectionLabelColor(key)">
+            <span>{{ sectionLabel(key) }}</span>
+            <span class="text-[10px] font-normal opacity-60">{{ group.length }}</span>
+          </div>
+          <div v-for="f in group" :key="f.path"
+               @click="selectArticle(f.path)"
+               class="flex items-center gap-2.5 px-5 py-2 cursor-pointer transition-all duration-150 group"
+               :class="selectedPath === f.path
+                 ? 'bg-accent-primary/15 text-accent-primary border-l-2 border-accent-primary'
+                 : 'text-text-secondary hover:text-text-primary hover:bg-white/[0.03] border-l-2 border-transparent'">
+            <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors duration-150"
+                  :class="dotColor(f.meta.category)"></span>
+            <span class="text-[13px] font-normal truncate">{{ f.meta.title || f.slug }}</span>
+          </div>
+        </template>
+      </div>
+
+      <!-- Nav Footer -->
+      <div class="px-5 py-3 border-t border-cosmos-border text-[11px] text-text-muted">
+        Powered by gitstyle
+      </div>
     </div>
-    <div id="content">
-      <div id="graph-view"></div>
-      <div id="article-view"></div>
-      <div class="graph-tooltip" id="tooltip"></div>
+
+    <!-- Slide-Over Reader Panel (right) -->
+    <transition name="slide-right">
+      <div v-if="selectedArticle"
+           class="fixed right-0 top-0 h-full w-[520px] z-10 flex flex-col overflow-hidden"
+           style="background: rgba(10, 14, 26, 0.95); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-left: 1px solid rgba(255,255,255,0.06); box-shadow: -8px 0 32px rgba(0,0,0,0.4);">
+
+        <!-- Reader Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-cosmos-border flex-shrink-0">
+          <div class="flex-1 min-w-0 mr-4">
+            <h2 class="text-lg font-semibold text-text-primary truncate">{{ articleMeta.title || selectedPath }}</h2>
+            <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span v-if="articleMeta.category"
+                    class="inline-flex items-center px-2.5 py-0.5 text-[11px] font-semibold rounded-full"
+                    :class="categoryBadgeClass(articleMeta.category)">
+                {{ articleMeta.category }}
+              </span>
+              <span v-if="articleMeta.confidence"
+                    class="inline-flex items-center px-2.5 py-0.5 text-[11px] font-semibold rounded-full"
+                    :class="confidenceBadgeClass">
+                {{ confidenceLabel }}
+              </span>
+            </div>
+          </div>
+          <button @click="closeReader"
+                  class="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/10 transition-colors duration-150 flex-shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Sources row -->
+        <div v-if="articleSources.length" class="px-6 py-2.5 border-b border-cosmos-border text-[12px] text-text-muted flex-shrink-0">
+          Sources: {{ articleSources.join(', ') }}
+        </div>
+
+        <!-- Article Body -->
+        <div class="flex-1 overflow-y-auto px-6 py-6">
+          <div class="article-content text-[15px] leading-relaxed text-text-secondary max-w-none"
+               v-html="renderedArticle"
+               @click="onArticleClick">
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Status Bar (bottom) -->
+    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-10 px-5 py-2 rounded-full text-[11px] text-text-muted font-mono"
+         style="background: rgba(15, 20, 40, 0.75); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.04);">
+      {{ statusText }}
     </div>
+
   </div>
 </div>
 
-<div id="cdn-error">
-  <h2>CDN Unreachable</h2>
-  <p>This viewer requires external libraries (D3.js, marked.js, highlight.js) loaded from CDN. Please check your internet connection and reload.</p>
-</div>
+<script src="https://unpkg.com/vue@3.4.27/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<!-- marked is pinned to v4.x because v5+ removed the highlight option -->
+<script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
 <script>
-// CDN dependency loader — versions are pinned intentionally.
-// marked is pinned to v4.x because v5+ removed the `highlight` option from
-// marked.parse(), which silently breaks code-block rendering. Do not bump
-// marked past 4.x without verifying highlight.js integration still works.
-const DEPS = [
-  { url: 'https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js', global: 'd3' },
-  { url: 'https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js', global: 'marked' },
-  { url: 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js', global: 'hljs' },
-];
-const HLJS_CSS = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css';
+const { createApp, ref, computed, watch, onMounted, nextTick } = Vue;
 
-let cdnReady = false;
+createApp({
+  setup() {
+    // ── State ──
+    const files = ref([]);
+    const graphData = ref(null);
+    const selectedPath = ref(null);
+    const selectedArticle = ref(null); // { meta, body }
+    const cdnError = ref(false);
+    const graphCanvas = ref(null);
 
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
+    let simulation = null;
+    let particleAnimId = null;
+    let svg = null;
+    let zoomBehavior = null;
 
-function loadCSS(href) {
-  const l = document.createElement('link');
-  l.rel = 'stylesheet';
-  l.href = href;
-  document.head.appendChild(l);
-}
-
-async function loadDeps() {
-  try {
-    loadCSS(HLJS_CSS);
-    for (const dep of DEPS) {
-      await loadScript(dep.url);
-      if (!window[dep.global]) throw new Error(`${dep.global} not loaded`);
-    }
-    cdnReady = true;
-  } catch (e) {
-    document.getElementById('cdn-error').style.display = 'flex';
-    document.getElementById('app').style.display = 'none';
-    return false;
-  }
-  return true;
-}
-
-// State
-let files = [];
-let graphData = null;
-let currentView = 'graph';
-let currentFile = null;
-let simulation = null;
-let particleAnimId = null;
-
-// API
-async function apiFetch(path) {
-  const r = await fetch(path);
-  return r.json();
-}
-
-// Sidebar
-function renderSidebar() {
-  const nav = document.getElementById('sidebar-nav');
-  const groups = { index: [], dimension: [], language: [], meta: [] };
-  files.forEach(f => {
-    const cat = f.meta.category || 'meta';
-    // Normalize: 'style' → 'dimension'
-    const key = cat === 'style' ? 'dimension' : cat;
-    (groups[key] || groups.meta).push(f);
-  });
-
-  let html = '';
-  const sections = [
-    ['index', 'Index'],
-    ['dimension', 'Style Dimensions'],
-    ['language', 'Languages'],
-    ['meta', 'Meta'],
-  ];
-  sections.forEach(([key, label]) => {
-    if (!groups[key] || groups[key].length === 0) return;
-    html += `<div class="nav-section">${label}</div>`;
-    groups[key].forEach(f => {
-      const title = f.meta.title || f.slug;
-      const active = currentFile === f.path ? ' active' : '';
-      const cat = f.meta.category || 'meta';
-      html += `<div class="nav-item${active}" data-path="${f.path}" data-cat="${cat}">${title}</div>`;
-    });
-  });
-  nav.innerHTML = html;
-
-  nav.querySelectorAll('.nav-item').forEach(el => {
-    el.addEventListener('click', () => {
-      navigateTo(el.dataset.path);
-    });
-  });
-}
-
-// Navigation
-async function navigateTo(path) {
-  currentFile = path;
-  currentView = 'article';
-  updateTabs();
-  renderSidebar();
-  await renderArticle(path);
-}
-
-function showGraph() {
-  currentView = 'graph';
-  currentFile = null;
-  updateTabs();
-  renderSidebar();
-  document.getElementById('graph-view').style.display = 'block';
-  document.getElementById('article-view').style.display = 'none';
-  document.getElementById('breadcrumb').textContent = '';
-}
-
-function updateTabs() {
-  document.querySelectorAll('.tab').forEach(t => {
-    t.classList.toggle('active', t.dataset.view === currentView);
-  });
-  const graphView = document.getElementById('graph-view');
-  const articleView = document.getElementById('article-view');
-  if (currentView === 'graph') {
-    graphView.style.display = 'block';
-    articleView.style.display = 'none';
-  } else {
-    graphView.style.display = 'none';
-    articleView.style.display = 'block';
-  }
-}
-
-// Article renderer
-async function renderArticle(path) {
-  const el = document.getElementById('article-view');
-  try {
-    const data = await apiFetch(`/api/file/${path}`);
-    if (data.error) { el.innerHTML = `<p style="color:var(--fg2);padding:24px">Article not found: ${path}</p>`; return; }
-    const meta = data.meta || {};
-    const body = data.body || '';
-
-    let confidence = meta.confidence;
-    let badgeClass = 'badge-medium';
-    if (typeof confidence === 'string') {
-      confidence = confidence === 'high' ? 0.9 : confidence === 'medium' ? 0.7 : 0.4;
-    }
-    if (confidence >= 0.8) badgeClass = 'badge-high';
-    else if (confidence < 0.5) badgeClass = 'badge-low';
-
-    let metaHtml = `<div class="article-meta">`;
-    metaHtml += `<h1>${meta.title || path}</h1>`;
-    if (meta.category) metaHtml += `<span class="badge badge-category">${meta.category}</span>`;
-    if (confidence !== undefined) metaHtml += `<span class="badge ${badgeClass}">${typeof confidence === 'number' ? (confidence * 100).toFixed(0) + '% confidence' : confidence}</span>`;
-    if (meta.sources && meta.sources.length > 0) {
-      metaHtml += `<div class="meta-row">Sources: ${Array.isArray(meta.sources) ? meta.sources.join(', ') : meta.sources}</div>`;
-    } else if (meta.source_repos && meta.source_repos.length > 0) {
-      metaHtml += `<div class="meta-row">Sources: ${meta.source_repos.join(', ')}</div>`;
-    }
-    if (meta.last_updated) {
-      metaHtml += `<div class="meta-row">Updated: ${meta.last_updated}</div>`;
-    }
-    metaHtml += `</div>`;
-
-    // Render markdown
-    const rendered = marked.parse(body, { gfm: true, breaks: false });
-
-    // Replace wikilinks with clickable links
-    const withLinks = rendered.replace(/\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g, (m, target, label) => {
-      const display = label || target;
-      return `<a href="#" class="wikilink" data-target="${target}">${display}</a>`;
+    // ── Computed ──
+    const groupedFiles = computed(() => {
+      const groups = { index: [], dimension: [], language: [], meta: [] };
+      files.value.forEach(f => {
+        const cat = f.meta.category || 'meta';
+        const key = cat === 'style' ? 'dimension' : cat;
+        (groups[key] || groups.meta).push(f);
+      });
+      return groups;
     });
 
-    el.innerHTML = metaHtml + `<div class="md-body">${withLinks}</div>`;
-    el.scrollTop = 0;
+    const articleMeta = computed(() => selectedArticle.value?.meta || {});
 
-    // Highlight code blocks
-    el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+    const articleSources = computed(() => {
+      const m = articleMeta.value;
+      if (m.sources && Array.isArray(m.sources)) return m.sources;
+      if (m.source_repos && Array.isArray(m.source_repos)) return m.source_repos;
+      if (typeof m.sources === 'string') return [m.sources];
+      return [];
+    });
 
-    // Wire wikilinks
-    el.querySelectorAll('.wikilink').forEach(a => {
-      a.addEventListener('click', e => {
-        e.preventDefault();
-        const target = a.dataset.target;
-        const match = files.find(f =>
-          f.slug === target ||
-          f.path === target + '.md' ||
-          f.path === target
-        );
-        if (match) navigateTo(match.path);
+    const confidenceValue = computed(() => {
+      const c = articleMeta.value.confidence;
+      if (typeof c === 'number') return c;
+      if (c === 'high') return 0.9;
+      if (c === 'medium') return 0.7;
+      return 0.4;
+    });
+
+    const confidenceLabel = computed(() => {
+      return (confidenceValue.value * 100).toFixed(0) + '% confidence';
+    });
+
+    const confidenceBadgeClass = computed(() => {
+      const v = confidenceValue.value;
+      if (v >= 0.8) return 'bg-emerald-500/15 text-emerald-400';
+      if (v >= 0.5) return 'bg-amber-500/15 text-amber-400';
+      return 'bg-red-500/15 text-red-400';
+    });
+
+    const statusText = computed(() => {
+      const n = graphData.value?.nodes?.length || 0;
+      const e = graphData.value?.edges?.length || 0;
+      let s = `${n} articles \u00b7 ${e} connections`;
+      if (selectedArticle.value) {
+        s += ` \u00b7 viewing: ${articleMeta.value.title || selectedPath.value}`;
+      }
+      return s;
+    });
+
+    const renderedArticle = computed(() => {
+      if (!selectedArticle.value) return '';
+      const body = selectedArticle.value.body || '';
+      try {
+        const html = marked.parse(body, { gfm: true, breaks: false });
+        // Replace [[wikilinks]] with clickable pills
+        return html.replace(/\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g, (m, target, label) => {
+          const display = label || target;
+          return `<a href="#" class="wikilink" data-target="${target}">${display}</a>`;
+        });
+      } catch (e) {
+        console.error('Markdown parse error:', e);
+        return `<p class="text-red-400">Error rendering article.</p>`;
+      }
+    });
+
+    // ── Methods ──
+    function sectionLabel(key) {
+      return { index: 'Index', dimension: 'Style Dimensions', language: 'Languages', meta: 'Meta' }[key] || key;
+    }
+
+    function sectionLabelColor(key) {
+      return {
+        index: 'text-amber-500/70',
+        dimension: 'text-accent-primary/70',
+        language: 'text-cyan-400/70',
+        meta: 'text-text-muted',
+      }[key] || 'text-text-muted';
+    }
+
+    function dotColor(cat) {
+      return {
+        index: 'bg-amber-500',
+        dimension: 'bg-accent-primary',
+        style: 'bg-accent-primary',
+        language: 'bg-cyan-400',
+        meta: 'bg-slate-500',
+      }[cat] || 'bg-slate-500';
+    }
+
+    function categoryBadgeClass(cat) {
+      return {
+        index: 'bg-amber-500/15 text-amber-400',
+        dimension: 'bg-purple-500/15 text-purple-400',
+        style: 'bg-purple-500/15 text-purple-400',
+        language: 'bg-cyan-500/15 text-cyan-400',
+        meta: 'bg-slate-500/15 text-slate-400',
+      }[cat] || 'bg-slate-500/15 text-slate-400';
+    }
+
+    async function selectArticle(path) {
+      selectedPath.value = path;
+      try {
+        const data = await fetch(`/api/file/${path}`).then(r => r.json());
+        if (data.error) {
+          selectedArticle.value = { meta: { title: path }, body: 'Article not found.' };
+          return;
+        }
+        selectedArticle.value = { meta: data.meta || {}, body: data.body || '' };
+        // Highlight code blocks after render
+        await nextTick();
+        document.querySelectorAll('.article-content pre code').forEach(block => {
+          hljs.highlightElement(block);
+        });
+        // Highlight corresponding node in graph
+        highlightNode(path);
+      } catch (err) {
+        console.error('Error loading article:', err);
+        selectedArticle.value = { meta: { title: path }, body: 'Error loading article.' };
+      }
+    }
+
+    function closeReader() {
+      selectedPath.value = null;
+      selectedArticle.value = null;
+      unhighlightAll();
+    }
+
+    function onCanvasClick(e) {
+      // Only close reader if clicking directly on the canvas background
+      if (e.target === graphCanvas.value || e.target.tagName === 'svg') {
+        closeReader();
+      }
+    }
+
+    function onArticleClick(e) {
+      const wl = e.target.closest('.wikilink');
+      if (!wl) return;
+      e.preventDefault();
+      const target = wl.dataset.target;
+      const match = files.value.find(f =>
+        f.slug === target ||
+        f.path === target + '.md' ||
+        f.path === target
+      );
+      if (match) selectArticle(match.path);
+    }
+
+    // ── Graph ──
+    const CATEGORY_COLORS = {
+      index: '#f59e0b',
+      dimension: '#7c5cfc',
+      style: '#7c5cfc',
+      language: '#22d3ee',
+      meta: '#64748b',
+    };
+
+    let nodeSelection, linkSelection, labelSelection, particleSelection;
+
+    function highlightNode(path) {
+      if (!nodeSelection) return;
+      const linkData = graphData.value?.edges || [];
+      const connected = new Set();
+      linkData.forEach(l => {
+        const sid = typeof l.source === 'object' ? l.source.id : l.source;
+        const tid = typeof l.target === 'object' ? l.target.id : l.target;
+        if (sid === path) connected.add(tid);
+        if (tid === path) connected.add(sid);
+      });
+      connected.add(path);
+
+      nodeSelection.attr('opacity', n => connected.has(n.id) ? 1 : 0.15);
+      linkSelection.attr('stroke-opacity', l => {
+        const sid = typeof l.source === 'object' ? l.source.id : l.source;
+        const tid = typeof l.target === 'object' ? l.target.id : l.target;
+        return connected.has(sid) && connected.has(tid) ? 0.7 : 0.03;
+      });
+      labelSelection.attr('opacity', n => connected.has(n.id) ? 1 : 0.08);
+      if (particleSelection) {
+        particleSelection.attr('opacity', pd => {
+          const sid = typeof pd.link.source === 'object' ? pd.link.source.id : pd.link.source;
+          const tid = typeof pd.link.target === 'object' ? pd.link.target.id : pd.link.target;
+          return connected.has(sid) && connected.has(tid) ? 0.4 : 0.03;
+        });
+      }
+    }
+
+    function unhighlightAll() {
+      if (!nodeSelection) return;
+      nodeSelection.attr('opacity', 1).attr('filter', 'url(#glow)');
+      linkSelection.attr('stroke-opacity', 0.25).attr('stroke', 'rgba(120,130,160,0.25)').attr('stroke-width', 1);
+      labelSelection.attr('opacity', 1);
+      if (particleSelection) particleSelection.attr('opacity', 0.2);
+    }
+
+    function renderGraph() {
+      if (!graphData.value || !graphCanvas.value) return;
+      if (particleAnimId) cancelAnimationFrame(particleAnimId);
+
+      const container = graphCanvas.value;
+      container.innerHTML = '';
+
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+
+      svg = d3.select(container)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+
+      // SVG defs
+      const defs = svg.append('defs');
+
+      // Glow filter
+      const glow = defs.append('filter')
+        .attr('id', 'glow')
+        .attr('x', '-50%').attr('y', '-50%')
+        .attr('width', '200%').attr('height', '200%');
+      glow.append('feGaussianBlur').attr('stdDeviation', '3.5').attr('result', 'blur');
+      const glowMerge = glow.append('feMerge');
+      glowMerge.append('feMergeNode').attr('in', 'blur');
+      glowMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+      // Intense glow for hover
+      const glowHover = defs.append('filter')
+        .attr('id', 'glow-hover')
+        .attr('x', '-50%').attr('y', '-50%')
+        .attr('width', '200%').attr('height', '200%');
+      glowHover.append('feGaussianBlur').attr('stdDeviation', '7').attr('result', 'blur');
+      const glowHoverMerge = glowHover.append('feMerge');
+      glowHoverMerge.append('feMergeNode').attr('in', 'blur');
+      glowHoverMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+      // Zoom
+      const g = svg.append('g');
+      zoomBehavior = d3.zoom()
+        .scaleExtent([0.2, 4])
+        .on('zoom', (event) => g.attr('transform', event.transform));
+      svg.call(zoomBehavior);
+
+      // Node sizing
+      const maxLinks = Math.max(1, d3.max(graphData.value.nodes, d => d.links) || 1);
+      const rScale = d3.scaleSqrt().domain([0, maxLinks]).range([8, 26]);
+
+      // Link data
+      const linkData = graphData.value.edges.map(e => ({ source: e.source, target: e.target }));
+
+      // Compute degree for adaptive link distance
+      const degree = {};
+      linkData.forEach(l => {
+        degree[l.source] = (degree[l.source] || 0) + 1;
+        degree[l.target] = (degree[l.target] || 0) + 1;
+      });
+      graphData.value.nodes.forEach(n => { n.degree = degree[n.id] || 0; });
+
+      // Force simulation — link strength 0.3 is the key insight
+      simulation = d3.forceSimulation(graphData.value.nodes)
+        .force('link', d3.forceLink(linkData)
+          .id(d => d.id)
+          .distance(d => {
+            const sDeg = d.source.degree || 1;
+            const tDeg = d.target.degree || 1;
+            return 150 + Math.sqrt(sDeg + tDeg) * 30;
+          })
+          .strength(0.3))
+        .force('charge', d3.forceManyBody()
+          .strength(-800)
+          .distanceMax(500))
+        .force('collide', d3.forceCollide()
+          .radius(d => rScale(d.links) + 30)
+          .strength(0.8))
+        .force('center', d3.forceCenter(width / 2, height / 2).strength(0.03))
+        .force('x', d3.forceX(width / 2).strength(0.02))
+        .force('y', d3.forceY(height / 2).strength(0.02))
+        .alphaDecay(0.012)
+        .velocityDecay(0.3);
+
+      // Links — curved bezier paths
+      linkSelection = g.append('g')
+        .selectAll('path')
+        .data(linkData)
+        .join('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'rgba(120,130,160,0.25)')
+        .attr('stroke-width', 1)
+        .attr('stroke-opacity', 0.25);
+
+      // Edge particles
+      const particleData = linkData.map((l, i) => ({
+        link: l,
+        offset: Math.random(),
+        speed: 0.0003 + Math.random() * 0.0005,
+        index: i,
+      }));
+      particleSelection = g.append('g')
+        .selectAll('circle')
+        .data(particleData)
+        .join('circle')
+        .attr('r', 1.5)
+        .attr('fill', '#ffffff')
+        .attr('opacity', 0.2);
+
+      function animateParticles() {
+        particleSelection.each(function(d) {
+          d.offset = (d.offset + d.speed * 16) % 1;
+          const s = d.link.source, t = d.link.target;
+          const sx = typeof s === 'object' ? s.x : 0;
+          const sy = typeof s === 'object' ? s.y : 0;
+          const tx = typeof t === 'object' ? t.x : 0;
+          const ty = typeof t === 'object' ? t.y : 0;
+          const dx = tx - sx, dy = ty - sy;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const off = dist * 0.12;
+          const mx = (sx + tx) / 2 + (dy / dist) * off;
+          const my = (sy + ty) / 2 - (dx / dist) * off;
+          const p = d.offset, ip = 1 - p;
+          d3.select(this)
+            .attr('cx', ip * ip * sx + 2 * ip * p * mx + p * p * tx)
+            .attr('cy', ip * ip * sy + 2 * ip * p * my + p * p * ty);
+        });
+        particleAnimId = requestAnimationFrame(animateParticles);
+      }
+      particleAnimId = requestAnimationFrame(animateParticles);
+
+      // Nodes
+      nodeSelection = g.append('g')
+        .selectAll('circle')
+        .data(graphData.value.nodes)
+        .join('circle')
+        .attr('r', d => rScale(d.links))
+        .attr('fill', d => CATEGORY_COLORS[d.category] || CATEGORY_COLORS.meta)
+        .attr('stroke', '#0a0e1a')
+        .attr('stroke-width', 1.5)
+        .attr('cursor', 'pointer')
+        .attr('filter', 'url(#glow)')
+        .attr('class', d => d.category === 'index' ? 'index-node' : '');
+
+      // Labels
+      labelSelection = g.append('g')
+        .selectAll('text')
+        .data(graphData.value.nodes)
+        .join('text')
+        .text(d => d.title)
+        .attr('font-size', 11)
+        .attr('font-weight', 500)
+        .attr('font-family', "'Inter', system-ui, sans-serif")
+        .attr('fill', '#94a3b8')
+        .attr('text-anchor', 'middle')
+        .attr('dy', d => rScale(d.links) + 16)
+        .attr('pointer-events', 'none')
+        .style('text-shadow', '0 1px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.6)');
+
+      // Drag
+      nodeSelection.call(d3.drag()
+        .on('start', (event, d) => {
+          if (!event.active) simulation.alphaTarget(0.3).restart();
+          d.fx = d.x; d.fy = d.y;
+        })
+        .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+        .on('end', (event, d) => {
+          if (!event.active) simulation.alphaTarget(0);
+          d.fx = null; d.fy = null;
+        })
+      );
+
+      // Hover — focus + context
+      nodeSelection.on('mouseover', (event, d) => {
+        if (selectedPath.value) return; // Don't override article highlight
+        const connected = new Set();
+        linkData.forEach(l => {
+          const sid = typeof l.source === 'object' ? l.source.id : l.source;
+          const tid = typeof l.target === 'object' ? l.target.id : l.target;
+          if (sid === d.id) connected.add(tid);
+          if (tid === d.id) connected.add(sid);
+        });
+        connected.add(d.id);
+
+        nodeSelection.attr('opacity', n => connected.has(n.id) ? 1 : 0.12)
+          .attr('filter', n => n.id === d.id ? 'url(#glow-hover)' : 'url(#glow)');
+        linkSelection.attr('stroke', l => {
+          const sid = typeof l.source === 'object' ? l.source.id : l.source;
+          const tid = typeof l.target === 'object' ? l.target.id : l.target;
+          return connected.has(sid) && connected.has(tid) ? 'rgba(124,92,252,0.5)' : 'rgba(120,130,160,0.05)';
+        }).attr('stroke-opacity', l => {
+          const sid = typeof l.source === 'object' ? l.source.id : l.source;
+          const tid = typeof l.target === 'object' ? l.target.id : l.target;
+          return connected.has(sid) && connected.has(tid) ? 0.8 : 0.05;
+        });
+        labelSelection.attr('opacity', n => connected.has(n.id) ? 1 : 0.06);
+        particleSelection.attr('opacity', pd => {
+          const sid = typeof pd.link.source === 'object' ? pd.link.source.id : pd.link.source;
+          const tid = typeof pd.link.target === 'object' ? pd.link.target.id : pd.link.target;
+          return connected.has(sid) && connected.has(tid) ? 0.5 : 0.04;
+        });
+      })
+      .on('mouseout', () => {
+        if (selectedPath.value) {
+          highlightNode(selectedPath.value);
+        } else {
+          unhighlightAll();
+        }
+      });
+
+      // Click — ripple + smooth zoom + open article
+      nodeSelection.on('click', (event, d) => {
+        event.stopPropagation();
+
+        // Ripple connected nodes
+        const connected = new Set();
+        linkData.forEach(l => {
+          const sid = typeof l.source === 'object' ? l.source.id : l.source;
+          const tid = typeof l.target === 'object' ? l.target.id : l.target;
+          if (sid === d.id) connected.add(tid);
+          if (tid === d.id) connected.add(sid);
+        });
+        nodeSelection.filter(n => connected.has(n.id))
+          .transition().duration(200).attr('r', n => rScale(n.links) * 1.15)
+          .transition().duration(300).attr('r', n => rScale(n.links));
+
+        // Smooth pan to node
+        const transform = d3.zoomTransform(svg.node());
+        const scale = Math.max(transform.k, 1.2);
+        svg.transition().duration(600).ease(d3.easeCubicInOut)
+          .call(zoomBehavior.transform,
+            d3.zoomIdentity.translate(width / 2 - 130, height / 2).scale(scale).translate(-d.x, -d.y));
+
+        selectArticle(d.id);
+      });
+
+      // Curved edge path
+      function linkArc(d) {
+        const dx = d.target.x - d.source.x;
+        const dy = d.target.y - d.source.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const offset = dist * 0.12;
+        const mx = (d.source.x + d.target.x) / 2 + (dy / dist) * offset;
+        const my = (d.source.y + d.target.y) / 2 - (dx / dist) * offset;
+        return `M${d.source.x},${d.source.y} Q${mx},${my} ${d.target.x},${d.target.y}`;
+      }
+
+      // Tick
+      simulation.on('tick', () => {
+        linkSelection.attr('d', linkArc);
+        nodeSelection.attr('cx', d => d.x).attr('cy', d => d.y);
+        labelSelection.attr('x', d => d.x).attr('y', d => d.y);
+      });
+    }
+
+    // Keyboard shortcut: Escape closes reader
+    function onKeydown(e) {
+      if (e.key === 'Escape' && selectedArticle.value) closeReader();
+    }
+
+    // ── Init ──
+    onMounted(async () => {
+      window.addEventListener('keydown', onKeydown);
+
+      // Check CDN deps loaded
+      if (typeof d3 === 'undefined' || typeof marked === 'undefined' || typeof hljs === 'undefined') {
+        cdnError.value = true;
+        return;
+      }
+
+      // Fetch data
+      const [filesRes, graphRes] = await Promise.all([
+        fetch('/api/files').then(r => r.json()),
+        fetch('/api/graph').then(r => r.json()),
+      ]);
+      files.value = filesRes;
+      graphData.value = graphRes;
+
+      await nextTick();
+      renderGraph();
+
+      // Re-render graph on resize
+      window.addEventListener('resize', () => {
+        renderGraph();
+        if (selectedPath.value) {
+          nextTick(() => highlightNode(selectedPath.value));
+        }
       });
     });
 
-    document.getElementById('breadcrumb').textContent = meta.title || path;
-  } catch (err) {
-    console.error('renderArticle error:', err);
-    el.innerHTML = `<p style="color:var(--fg2);padding:24px">Error loading article. Check console for details.</p>`;
+    return {
+      files, graphData, selectedPath, selectedArticle, cdnError, graphCanvas,
+      groupedFiles, articleMeta, articleSources, confidenceLabel, confidenceBadgeClass,
+      statusText, renderedArticle,
+      sectionLabel, sectionLabelColor, dotColor, categoryBadgeClass,
+      selectArticle, closeReader, onCanvasClick, onArticleClick,
+    };
   }
-}
-
-// Graph
-const CATEGORY_COLORS = {
-  index: '#f0a500',
-  dimension: '#7c5cfc',
-  style: '#7c5cfc',
-  language: '#00e676',
-  meta: '#607d8b',
-};
-
-function renderGraph() {
-  if (!graphData || !cdnReady) return;
-  if (particleAnimId) cancelAnimationFrame(particleAnimId);
-
-  const container = document.getElementById('graph-view');
-  container.innerHTML = '';
-  const tooltip = document.getElementById('tooltip');
-  const width = container.clientWidth;
-  const height = container.clientHeight;
-
-  const svg = d3.select(container)
-    .append('svg')
-    .attr('width', width)
-    .attr('height', height);
-
-  // SVG defs — glow filter and edge gradients
-  const defs = svg.append('defs');
-
-  // Glow filter
-  const glowFilter = defs.append('filter')
-    .attr('id', 'glow')
-    .attr('x', '-50%').attr('y', '-50%')
-    .attr('width', '200%').attr('height', '200%');
-  glowFilter.append('feGaussianBlur')
-    .attr('stdDeviation', '4')
-    .attr('result', 'coloredBlur');
-  const glowMerge = glowFilter.append('feMerge');
-  glowMerge.append('feMergeNode').attr('in', 'coloredBlur');
-  glowMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-
-  // Intense glow filter for hover
-  const glowHoverFilter = defs.append('filter')
-    .attr('id', 'glow-hover')
-    .attr('x', '-50%').attr('y', '-50%')
-    .attr('width', '200%').attr('height', '200%');
-  glowHoverFilter.append('feGaussianBlur')
-    .attr('stdDeviation', '8')
-    .attr('result', 'coloredBlur');
-  const glowHoverMerge = glowHoverFilter.append('feMerge');
-  glowHoverMerge.append('feMergeNode').attr('in', 'coloredBlur');
-  glowHoverMerge.append('feMergeNode').attr('in', 'SourceGraphic');
-
-  // Edge gradient (lighter at source, fades to edge color)
-  const edgeGradient = defs.append('linearGradient')
-    .attr('id', 'edge-gradient')
-    .attr('gradientUnits', 'userSpaceOnUse');
-  edgeGradient.append('stop')
-    .attr('offset', '0%')
-    .attr('stop-color', 'rgba(160,170,200,0.5)');
-  edgeGradient.append('stop')
-    .attr('offset', '100%')
-    .attr('stop-color', 'rgba(120,130,160,0.2)');
-
-  // Zoom layer
-  const g = svg.append('g');
-  const zoomBehavior = d3.zoom()
-    .scaleExtent([0.2, 4])
-    .on('zoom', (event) => g.attr('transform', event.transform));
-  svg.call(zoomBehavior);
-
-  // Scale node size by link count
-  const maxLinks = Math.max(1, d3.max(graphData.nodes, d => d.links) || 1);
-  const rScale = d3.scaleSqrt().domain([0, maxLinks]).range([8, 28]);
-
-  // Build simulation
-  const linkData = graphData.edges.map(e => ({
-    source: e.source,
-    target: e.target,
-  }));
-
-  simulation = d3.forceSimulation(graphData.nodes)
-    .force('link', d3.forceLink(linkData).id(d => d.id).distance(300))
-    .force('charge', d3.forceManyBody().strength(-1500).distanceMax(800))
-    .force('center', d3.forceCenter(width / 2, height / 2).strength(0.02))
-    .force('collision', d3.forceCollide().radius(d => rScale(d.links) + 40))
-    .alphaDecay(0.01);
-
-  // Links — curved paths instead of lines
-  const link = g.append('g')
-    .selectAll('path')
-    .data(linkData)
-    .join('path')
-    .attr('fill', 'none')
-    .attr('stroke', 'rgba(120,130,160,0.3)')
-    .attr('stroke-width', 1)
-    .attr('stroke-opacity', 0.3);
-
-  // Edge particles — small dots traveling along links
-  const particles = g.append('g').attr('class', 'particles');
-  const particleData = linkData.map((l, i) => ({
-    link: l,
-    offset: Math.random(),
-    speed: 0.0003 + Math.random() * 0.0005,
-    index: i,
-  }));
-  const particleCircles = particles.selectAll('circle')
-    .data(particleData)
-    .join('circle')
-    .attr('r', 1.5)
-    .attr('fill', '#ffffff')
-    .attr('opacity', 0.25);
-
-  function animateParticles() {
-    particleCircles.each(function(d) {
-      d.offset = (d.offset + d.speed * 16) % 1;
-      const s = d.link.source, t = d.link.target;
-      const sx = typeof s === 'object' ? s.x : 0;
-      const sy = typeof s === 'object' ? s.y : 0;
-      const tx = typeof t === 'object' ? t.x : 0;
-      const ty = typeof t === 'object' ? t.y : 0;
-      // Follow the curved path (quadratic bezier interpolation)
-      const dx = tx - sx, dy = ty - sy;
-      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      const off = dist * 0.12;
-      const mx = (sx + tx) / 2 + (dy / dist) * off;
-      const my = (sy + ty) / 2 - (dx / dist) * off;
-      const p = d.offset;
-      const ip = 1 - p;
-      // Quadratic bezier: B(t) = (1-t)^2*P0 + 2*(1-t)*t*P1 + t^2*P2
-      const cx = ip * ip * sx + 2 * ip * p * mx + p * p * tx;
-      const cy = ip * ip * sy + 2 * ip * p * my + p * p * ty;
-      d3.select(this).attr('cx', cx).attr('cy', cy);
-    });
-    particleAnimId = requestAnimationFrame(animateParticles);
-  }
-  particleAnimId = requestAnimationFrame(animateParticles);
-
-  // Nodes
-  const node = g.append('g')
-    .selectAll('circle')
-    .data(graphData.nodes)
-    .join('circle')
-    .attr('r', d => rScale(d.links))
-    .attr('fill', d => CATEGORY_COLORS[d.category] || CATEGORY_COLORS.meta)
-    .attr('stroke', '#0d1117')
-    .attr('stroke-width', 1.5)
-    .attr('cursor', 'pointer')
-    .attr('filter', 'url(#glow)')
-    .attr('class', d => d.category === 'index' ? 'index-node' : '');
-
-  // Labels
-  const label = g.append('g')
-    .selectAll('text')
-    .data(graphData.nodes)
-    .join('text')
-    .text(d => d.title)
-    .attr('font-size', 12)
-    .attr('font-weight', 500)
-    .attr('font-family', "'Inter',-apple-system,BlinkMacSystemFont,sans-serif")
-    .attr('fill', '#e6edf3')
-    .attr('text-anchor', 'middle')
-    .attr('dy', d => rScale(d.links) + 16)
-    .attr('pointer-events', 'none')
-    .style('text-shadow', '0 1px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)');
-
-  // Drag
-  node.call(d3.drag()
-    .on('start', (event, d) => {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
-      d.fx = d.x;
-      d.fy = d.y;
-    })
-    .on('drag', (event, d) => {
-      d.fx = event.x;
-      d.fy = event.y;
-    })
-    .on('end', (event, d) => {
-      if (!event.active) simulation.alphaTarget(0);
-      d.fx = null;
-      d.fy = null;
-    })
-  );
-
-  // Hover highlight
-  node.on('mouseover', (event, d) => {
-    const connected = new Set();
-    linkData.forEach(l => {
-      const sid = typeof l.source === 'object' ? l.source.id : l.source;
-      const tid = typeof l.target === 'object' ? l.target.id : l.target;
-      if (sid === d.id) connected.add(tid);
-      if (tid === d.id) connected.add(sid);
-    });
-    connected.add(d.id);
-
-    node.attr('opacity', n => connected.has(n.id) ? 1 : 0.12)
-        .attr('filter', n => n.id === d.id ? 'url(#glow-hover)' : 'url(#glow)');
-    link.attr('stroke', l => {
-      const sid = typeof l.source === 'object' ? l.source.id : l.source;
-      const tid = typeof l.target === 'object' ? l.target.id : l.target;
-      return connected.has(sid) && connected.has(tid) ? 'rgba(124,92,252,0.4)' : 'rgba(120,130,160,0.05)';
-    }).attr('stroke-opacity', l => {
-      const sid = typeof l.source === 'object' ? l.source.id : l.source;
-      const tid = typeof l.target === 'object' ? l.target.id : l.target;
-      return connected.has(sid) && connected.has(tid) ? 0.8 : 0.05;
-    }).attr('stroke-width', l => {
-      const sid = typeof l.source === 'object' ? l.source.id : l.source;
-      const tid = typeof l.target === 'object' ? l.target.id : l.target;
-      return connected.has(sid) && connected.has(tid) ? 1.5 : 1;
-    });
-    label.attr('opacity', n => connected.has(n.id) ? 1 : 0.06);
-    particleCircles.attr('opacity', pd => {
-      const sid = typeof pd.link.source === 'object' ? pd.link.source.id : pd.link.source;
-      const tid = typeof pd.link.target === 'object' ? pd.link.target.id : pd.link.target;
-      return connected.has(sid) && connected.has(tid) ? 0.5 : 0.04;
-    });
-
-    tooltip.style.opacity = 1;
-    tooltip.innerHTML = `<strong>${d.title}</strong><br>${d.category} &middot; ${d.links} connections`;
-    tooltip.style.left = (event.pageX + 12) + 'px';
-    tooltip.style.top = (event.pageY - 12) + 'px';
-  })
-  .on('mousemove', (event) => {
-    tooltip.style.left = (event.pageX + 12) + 'px';
-    tooltip.style.top = (event.pageY - 12) + 'px';
-  })
-  .on('mouseout', () => {
-    node.attr('opacity', 1).attr('filter', 'url(#glow)');
-    link.attr('stroke', 'rgba(120,130,160,0.3)').attr('stroke-opacity', 0.3).attr('stroke-width', 1);
-    label.attr('opacity', 1);
-    particleCircles.attr('opacity', 0.25);
-    tooltip.style.opacity = 0;
-  });
-
-  // Click — ripple connected nodes + smooth zoom + navigate
-  node.on('click', (event, d) => {
-    // Ripple: briefly pulse connected nodes
-    const connected = new Set();
-    linkData.forEach(l => {
-      const sid = typeof l.source === 'object' ? l.source.id : l.source;
-      const tid = typeof l.target === 'object' ? l.target.id : l.target;
-      if (sid === d.id) connected.add(tid);
-      if (tid === d.id) connected.add(sid);
-    });
-    node.filter(n => connected.has(n.id))
-      .transition().duration(200)
-      .attr('r', n => rScale(n.links) * 1.2)
-      .transition().duration(300)
-      .attr('r', n => rScale(n.links));
-
-    // Smooth pan to clicked node
-    const transform = d3.zoomTransform(svg.node());
-    const scale = Math.max(transform.k, 1.2);
-    svg.transition().duration(600).ease(d3.easeCubicInOut)
-      .call(zoomBehavior.transform,
-        d3.zoomIdentity.translate(width / 2, height / 2).scale(scale).translate(-d.x, -d.y)
-      );
-
-    setTimeout(() => navigateTo(d.id), 300);
-  });
-
-  // Compute curved path for edges
-  function linkArc(d) {
-    const dx = d.target.x - d.source.x;
-    const dy = d.target.y - d.source.y;
-    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-    const offset = dist * 0.12;
-    const mx = (d.source.x + d.target.x) / 2 + (dy / dist) * offset;
-    const my = (d.source.y + d.target.y) / 2 - (dx / dist) * offset;
-    return `M${d.source.x},${d.source.y} Q${mx},${my} ${d.target.x},${d.target.y}`;
-  }
-
-  // Tick
-  simulation.on('tick', () => {
-    link.attr('d', linkArc);
-    node
-      .attr('cx', d => d.x)
-      .attr('cy', d => d.y);
-    label
-      .attr('x', d => d.x)
-      .attr('y', d => d.y);
-  });
-}
-
-// Tab clicks
-document.querySelectorAll('.tab').forEach(t => {
-  t.addEventListener('click', () => {
-    if (t.dataset.view === 'graph') {
-      showGraph();
-    } else if (currentFile) {
-      currentView = 'article';
-      updateTabs();
-    }
-  });
-});
-
-// Resize
-window.addEventListener('resize', () => {
-  if (currentView === 'graph') renderGraph();
-});
-
-// Init
-async function init() {
-  const ok = await loadDeps();
-  if (!ok) return;
-
-  [files, graphData] = await Promise.all([
-    apiFetch('/api/files'),
-    apiFetch('/api/graph'),
-  ]);
-
-  renderSidebar();
-  renderGraph();
-}
-
-init();
+}).mount('#app');
 </script>
 </body>
 </html>
