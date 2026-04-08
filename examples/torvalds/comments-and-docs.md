@@ -1,96 +1,55 @@
 ---
-title: "Comments & Documentation"
-category: style
-confidence: high
-sources: [torvalds/linux]
-related: [naming-conventions, code-structure, commit-hygiene]
-last_updated: 2026-04-07
+title: Comments and Documentation Style
+category: dimension
+confidence: 0.9
+source_repos:
+  - torvalds/1590A
+  - torvalds/AudioNoise
+  - torvalds/GuitarPedal
+  - torvalds/HunspellColorize
+  - torvalds/linux
+  - torvalds/pesconvert
+  - torvalds/test-tlb
+  - torvalds/uemacs
+last_updated: 2026-04-08
 ---
+The developer demonstrates a distinctive documentation philosophy that prioritizes explanatory value over volume, with a particular emphasis on the 'why' rather than the 'what' of code decisions.
 
-# Comments & Documentation
+## Inline Comments
 
-## Comments Explain Why, Not What
+The developer uses inline comments sparingly but strategically. When comments do appear, they focus on explaining complex logic [4210d1cf, 4ac62b97], hardware-specific behaviors [3036cd0d, 86782c16], and non-obvious design decisions [c9098c2c, 2f3c1c07]. The developer strongly prefers inline comments over block comments for explaining implementation details [86782c16, 66d64899], particularly when dealing with:
 
-Code should be self-documenting through clear [[naming-conventions]] and straightforward structure. Comments are reserved for explaining non-obvious reasoning: why a particular approach was chosen, what hardware quirk is being worked around, or what invariant must hold. [f1a9c3d](https://github.com/torvalds/linux/commit/f1a9c3d)
+- Hardware workarounds and timing issues [bfe62a45, f8f5627a]
+- Character encoding complexities [e8f984a1, ec6f4f36]
+- Mathematical calculations and algorithms [c9098c2c, b19dca57]
+- Performance considerations [cedcf700, 784130fa]
 
-```c
-/*
- * We need to disable preemption here because the per-cpu
- * data might migrate to another CPU between the read and
- * the update, giving us stale values.
- */
-preempt_disable();
-```
+The commenting style is notably conversational and informal, often including self-deprecating humor [1ac1fc73, 66ff8cb8] and candid observations like "XML? F*ck me with a ten-foot pole" [7a7221a3]. This informal tone extends to acknowledging the age and limitations of codebases [1c1b25ef, 1cdcf9df].
 
-Comments that restate what the code does are treated as noise and rejected in review:
+## Commit Messages
 
-```c
-/* Bad: restates the code */
-i++;  /* increment i */
+The developer's [[commit-hygiene]] is exceptional, with commit messages that often exceed the code changes themselves in length. These messages consistently include:
 
-/* Bad: describes the obvious */
-/* check if pointer is null */
-if (!ptr)
-    return -EINVAL;
-```
+- Detailed problem descriptions and solution rationale [3036cd0d, 86782c16]
+- Historical context and cultural references [6a6daef2, f434a0e2]
+- Personal anecdotes and philosophical musings [ea71138d, 5c6c230f]
+- Test results and future plans [e3660495, eb0d867a]
+- Attribution to original authors and external help [93a72563, 4e524250]
 
-Torvalds' position is that if code needs a comment to explain what it does, the code should be rewritten so it does not. Comments exist for the *why* — hardware errata, subtle ordering constraints, historical context for a non-obvious design choice. The corollary: a comment explaining "what" implies the code is too clever.
+Merge commits receive particular attention, containing comprehensive changelogs with bullet-pointed summaries, CVE references, and subsystem categorization [66d64899, f8f5627a, 85fb6da4].
 
-## Sharp Review Comments
+## Documentation Philosophy
 
-Torvalds' code review style is direct and unambiguous. Review comments on patches tend to be terse, specific, and focused on correctness rather than style preferences. When a pattern violates kernel conventions, the feedback references the coding style document or prior precedent. [b2e8d4a](https://github.com/torvalds/linux/commit/b2e8d4a)
+The developer follows a "self-documenting code" philosophy, preferring clear [[naming-conventions]] and [[code-structure]] over excessive inline documentation [bc93b501, d2f2439e]. When documentation is necessary, it tends to be comprehensive - README files explain motivation, usage, and limitations thoroughly [bc93b501, 0d99d1c8].
 
-Inline review comments in the source itself follow the same philosophy — they are warnings to future developers, not tutorials:
+The developer openly acknowledges external assistance, including AI/Google help, in both commits and comments [93a72563, 4e524250, ed2e0c15]. This transparency extends to crediting external sources and libraries [b19dca57, 749d90d4].
 
-```c
-/*
- * NOTE: this function must be called with irqs disabled.
- * See commit c3b7a1e ("fix: race in task migration")
- * for the painful debugging session that discovered this.
- */
-```
+## Language-Specific Patterns
 
-These in-source comments often reference specific commits, serving as breadcrumbs for anyone who needs to understand the history behind a constraint.
+Across different [[language-idioms]], the documentation approach remains consistent:
+- In [[c]], comments focus on hardware behavior and performance
+- In [[assembly]], comments explain timing and hardware workarounds
+- In [[python]] and scripting languages, comments are minimal, relying on clear code
+- In [[openscad]] and domain-specific languages, commit messages carry the documentation burden
 
-## kernel-doc Format
-
-Public API functions use the `kernel-doc` format (`/** ... */`), which is extractable by the Sphinx-based documentation build system. The format is structured but minimal — parameter descriptions are mandatory, return value documentation is expected. Functions exported via `EXPORT_SYMBOL` are expected to have kernel-doc comments; internal `static` functions are not. [d5c3f1a](https://github.com/torvalds/linux/commit/d5c3f1a)
-
-```c
-/**
- * kmalloc - allocate kernel memory
- * @size: number of bytes to allocate
- * @flags: GFP allocation flags
- *
- * Returns a pointer to the allocated memory, or NULL on failure.
- * The allocated memory is not zeroed. See kzalloc() for zeroed
- * allocation.
- */
-void *kmalloc(size_t size, gfp_t flags);
-```
-
-The kernel-doc format uses `@param` annotations (without the `@` — just `@name:`) and a specific structure: one-line summary, parameter list, then description. Malformed kernel-doc triggers warnings during the documentation build, and the `-Werror` push has made these warnings into build failures on some configurations.
-
-## Locking Documentation
-
-Every lock and every data structure protected by a lock has a comment documenting the locking requirements. This is non-negotiable — see [[patterns]] for locking discipline details. [e4a7b2c](https://github.com/torvalds/linux/commit/e4a7b2c)
-
-```c
-/*
- * Protected by rcu_read_lock() for read access.
- * task_lock() required for modification.
- */
-struct list_head children;
-```
-
-Lock documentation follows a consistent pattern: state which lock protects the data, whether it's for read-only or read-write access, and any ordering constraints relative to other locks. The `lockdep_assert_held()` macro turns these comments into executable assertions (see [[testing]]).
-
-## The -Werror Push
-
-The kernel is progressively moving toward building with `-Werror` — treating all compiler warnings as errors. This makes compiler diagnostics a form of documentation enforcement: unused variables, missing format string arguments, implicit fallthrough in switch statements, and kernel-doc format errors all become hard failures. Torvalds has been supportive of this direction while pragmatic about architecture-specific cases where legacy code produces spurious warnings.
-
-## What Does Not Get Documented
-
-Trivial helper functions, obvious data structure fields, and anything that would be better communicated by renaming the identifier. The kernel's position is that if a function needs a paragraph of comments to explain what it does, the function should be rewritten, not commented. See [[commit-hygiene]] for how commit messages serve as the permanent record of *why* changes were made.
-
-Commit messages are treated as the kernel's long-form documentation. The code comments explain local invariants; the commit messages explain the reasoning behind changes. Together with the mailing list archive, they form a complete audit trail.
+The developer's documentation style reflects a pragmatic approach: document thoroughly when it matters (complex logic, non-obvious decisions, historical context) but avoid redundant comments that merely restate the code.

@@ -632,8 +632,8 @@ class TestCompleteJsonRetry:
         assert "original prompt" in prompts_seen[1]
 
     @patch.object(LLMClient, '__init__', lambda self, **kwargs: None)
-    def test_default_max_tokens_is_32768(self):
-        """Verify max_tokens default was increased to 32768."""
+    def test_default_max_tokens_is_16384(self):
+        """Verify max_tokens default is 16384 (safe for all models including Opus)."""
         client = LLMClient()
         client.model = "test"
         client._last_stop_reason = "end_turn"
@@ -647,7 +647,7 @@ class TestCompleteJsonRetry:
         with patch.object(client, 'complete', side_effect=mock_complete):
             client.complete_json("system", "prompt")
 
-        assert captured_max_tokens[0] == 32768
+        assert captured_max_tokens[0] == 16384
 
 
 # ---------------------------------------------------------------------------

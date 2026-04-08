@@ -270,7 +270,7 @@ See the `examples/` directory for complete wiki outputs:
 - [`examples/torvalds/`](examples/torvalds/) — Linus Torvalds' kernel C style
 
 ### Organizations
-- [`examples/anthropic/`](examples/anthropic/) — Anthropic's SDK and developer tools patterns (anthropic-sdk-python, anthropic-cookbook, claude-code)
+- [`examples/anthropics/`](examples/anthropics/) — Anthropic's SDK and developer tools patterns (anthropic-sdk-python, anthropic-cookbook, claude-code)
 - [`examples/openai/`](examples/openai/) — OpenAI's SDK + research code patterns (openai-python, tiktoken, whisper, CLIP)
 
 ## Development

@@ -36,7 +36,7 @@ def write_wiki(
         _write_article(path, article)
 
     # Write index
-    _write_index(out, articles)
+    _write_index(out, articles, config)
 
     # Write meta files
     _write_sources(out, articles)
@@ -74,15 +74,18 @@ def _write_article(path: Path, article: WikiArticle) -> None:
         f.write("\n")
 
 
-def _write_index(out: Path, articles: list[WikiArticle]) -> None:
+def _write_index(out: Path, articles: list[WikiArticle], config: GitStyleConfig) -> None:
+    name = config.username
+    is_org = config.context_type == "Organization"
+    title = f"{name} Engineering Style Wiki" if not is_org else f"{name} Org Engineering Style Wiki"
     lines = [
         "---",
-        "title: Engineering Style Wiki",
+        f"title: \"{title}\"",
         "category: index",
         f"last_updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d')}",
         "---",
         "",
-        "# Engineering Style Wiki",
+        f"# {title}",
         "",
         "## Style Dimensions",
         "",

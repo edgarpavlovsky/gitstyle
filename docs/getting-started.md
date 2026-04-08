@@ -89,7 +89,7 @@ If you want to see what a gitstyle wiki looks like without running the pipeline:
 # Comes with four example wikis
 gitstyle serve -w examples/karpathy     # ML researcher, Python/C
 gitstyle serve -w examples/torvalds     # Kernel, C
-gitstyle serve -w examples/anthropic    # AI company, multi-language
+gitstyle serve -w examples/anthropics   # AI company, multi-language
 gitstyle serve -w examples/openai       # AI company, research + SDK
 ```
 

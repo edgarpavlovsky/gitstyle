@@ -1,130 +1,135 @@
 ---
-title: "Python Idioms"
+title: Python Style Guide
 category: language
-confidence: high
-sources: [karpathy/nanoGPT, karpathy/micrograd, karpathy/minbpe, karpathy/makemore]
-related: [naming-conventions, type-discipline, patterns]
-last_updated: 2026-04-07
+confidence: 0.88
+source_repos:
+  - karpathy/EigenLibSVM
+  - karpathy/KarpathyTalk
+  - karpathy/LLM101n
+  - karpathy/Random-Forest-Matlab
+  - karpathy/arxiv-sanity-lite
+  - karpathy/arxiv-sanity-preserver
+  - karpathy/autoresearch
+  - karpathy/build-nanogpt
+  - karpathy/calorie
+  - karpathy/char-rnn
+  - karpathy/convnetjs
+  - karpathy/covid-sanity
+  - karpathy/cryptos
+  - karpathy/deep-vector-quantization
+  - karpathy/find-birds
+  - karpathy/forestjs
+  - karpathy/hn-time-capsule
+  - karpathy/jobs
+  - karpathy/karpathy
+  - karpathy/karpathy.github.io
+  - karpathy/lecun1989-repro
+  - karpathy/llama2.c
+  - karpathy/llm-council
+  - karpathy/llm.c
+  - karpathy/makemore
+  - karpathy/micrograd
+  - karpathy/minGPT
+  - karpathy/minbpe
+  - karpathy/nanoGPT
+  - karpathy/nanochat
+  - karpathy/neuraltalk
+  - karpathy/neuraltalk2
+  - karpathy/ng-video-lecture
+  - karpathy/nipspreview
+  - karpathy/nn-zero-to-hero
+  - karpathy/notpygamejs
+  - karpathy/paper-notes
+  - karpathy/pytorch-normalizing-flows
+  - karpathy/randomfun
+  - karpathy/reader3
+  - karpathy/recurrentjs
+  - karpathy/reinforcejs
+  - karpathy/rendergit
+  - karpathy/researchlei
+  - karpathy/researchpooler
+  - karpathy/rustbpe
+  - karpathy/scholaroctopus
+  - karpathy/svmjs
+  - karpathy/tf-agent
+  - karpathy/tsnejs
+  - karpathy/twoolpy
+  - karpathy/ulogme
+last_updated: 2026-04-08
 ---
+# Python Style Guide
 
-# Python Idioms
+This developer demonstrates mastery of Python's idiomatic patterns and modern features, with a strong focus on scientific computing and deep learning frameworks.
 
-## f-strings for Everything
+## Modern Python Features
 
-String formatting uses f-strings exclusively. No `%` formatting, no `.format()`. This applies to print statements, error messages, and file paths: [d4b8f2a](https://github.com/karpathy/nanoGPT/commit/d4b8f2a)
+The developer consistently leverages modern Python [[language-idioms]], including:
 
-```python
-print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-print(f"number of parameters: {sum(p.numel() for p in model.parameters())/1e6:.2f}M")
-```
+- **Type annotations and dataclasses**: Uses `@dataclass` decorators with field defaults and type hints throughout (64960f99)
+- **F-strings for formatting**: Prefers f-strings over older formatting methods, even using numeric underscores like `1_000_000` for readability (7fa0be64)
+- **Context managers**: Employs `with` statements and `nullcontext` appropriately (6e6a5281, a022d02e)
+- **Pathlib for file operations**: Uses `pathlib` instead of `os.path` for modern file handling (e9345a4b, 739f1013)
 
-## Comprehensions Over Loops
+## Functional Programming Patterns
 
-List and dict comprehensions are preferred over explicit loops for transformations. Generator expressions for sums and aggregations: [a1c4e7f](https://github.com/karpathy/micrograd/commit/a1c4e7f)
+The developer embraces Python's functional programming capabilities:
 
-```python
-# from micrograd — MLP parameter collection via nested comprehension
-def parameters(self):
-    return [p for layer in self.layers for p in layer.parameters()]
-```
+- **List and dictionary comprehensions**: Uses comprehensions extensively for data transformations rather than explicit loops (f99b57a9, 12ccb4ab, 6e85778b)
+- **Generator expressions**: Employs generators for memory-efficient operations (7e8c3cd0, 9fd9cc02)
+- **Lambda functions**: Uses inline lambdas for initialization logic and sorting operations (a1e226dd, 51c54e0f)
+- **Decorators**: Applies `@lru_cache`, `@classmethod`, and `@staticmethod` appropriately (64960f99, 0a20bbc1)
 
-## Unpacking for Shape Extraction
+## Scientific Computing Idioms
 
-Tuple unpacking is the standard way to extract tensor dimensions. Never `x.size(0)` when `b, t, c = x.size()` is available. This makes the dimensionality of every tensor visible at the point of use: [f7e2b9c](https://github.com/karpathy/nanoGPT/commit/f7e2b9c)
+Strong command of NumPy and scientific Python [[patterns]]:
 
-```python
-B, T, C = x.size()
-b, t = idx.size()
-```
+- **NumPy broadcasting**: Leverages vectorized operations and broadcasting instead of explicit loops (2c99eac2, f399811c)
+- **Array operations**: Uses NumPy idiomatically for numerical computations (4c84bc74, 9740a652)
+- **Matplotlib integration**: Consistently uses `%matplotlib inline` in notebooks (26675947, 2fb6f76d)
 
-## torch.nn.functional Over Methods
+## PyTorch-Specific Patterns
 
-Functional API (`F.relu`, `F.cross_entropy`, `F.scaled_dot_product_attention`) is preferred over module wrappers (`nn.ReLU()`) for operations that don't have learnable parameters. Modules are reserved for layers with weights: [d4b8f2a](https://github.com/karpathy/nanoGPT/commit/d4b8f2a)
+The developer demonstrates deep familiarity with PyTorch [[language-idioms]]:
 
-```python
-# functional for stateless ops
-x = F.gelu(self.c_fc(x))
-loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+- **Device-agnostic code**: Writes portable code with explicit device type checking for CUDA operations (6104ab1b, 41af0d18)
+- **Module patterns**: Uses `nn.Module` inheritance, `ModuleList`, and `ModuleDict` correctly (a6e0bee4, b60e119b)
+- **Custom autograd functions**: Implements PyTorch-specific patterns for distributed training (e569b59f, 1076f970)
+- **Parameter management**: Uses `nn.Parameter` explicitly rather than relying on higher-level abstractions (a1e226dd, ac30aa07)
 
-# module for stateful layers
-self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd, bias=config.bias)
-```
+## Async/Await Patterns
 
-This distinction creates a visual signal: if you see `F.something`, there are no learned parameters; if you see `self.something(x)`, there are.
+The developer uses Python's async features idiomatically:
 
-## Context Managers for Device Management
+- Implements `async`/`await` patterns throughout asynchronous code (eb0eb26f, 87b4a178)
+- Leverages `asyncio` for concurrent operations following modern async conventions
 
-`torch.no_grad()` and `torch.cuda.amp.autocast()` are used as context managers, keeping the scope visually obvious: [a7f3b8c](https://github.com/karpathy/nanoGPT/commit/a7f3b8c)
+## Code Organization
 
-```python
-@torch.no_grad()
-def estimate_loss():
-    ...
+Follows Python conventions for [[code-structure]]:
 
-with torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16):
-    logits, loss = model(X, Y)
-```
+- **Main guards**: Consistently uses `if __name__ == '__main__':` guards (4eb7a96b, 02511eba)
+- **Public API declarations**: Uses `__all__` to define public interfaces (436af545)
+- **Future annotations**: Imports `from __future__ import annotations` for forward compatibility (e661637e)
 
-## Dictionary Merge for Optimizer Groups
+## Legacy Code Handling
 
-Parameter groups for the optimizer are constructed via dict comprehension and filtering. This pattern repeats identically across nanoGPT and makemore, separating weight-decay parameters (matrices) from no-decay parameters (biases, layer norms): [b3e1a7d](https://github.com/karpathy/nanoGPT/commit/b3e1a7d)
+The codebase shows evolution from Python 2.x to 3.x:
 
-```python
-def configure_optimizers(self, weight_decay, learning_rate, betas, device_type):
-    param_dict = {pn: p for pn, p in self.named_parameters() if p.requires_grad}
-    decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
-    nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]
-    optim_groups = [
-        {'params': decay_params, 'weight_decay': weight_decay},
-        {'params': nodecay_params, 'weight_decay': 0.0},
-    ]
-    return torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas)
-```
+- Older commits use Python 2 syntax like `print` statements and `cPickle` (72204877, f85afab4)
+- Modern commits fully embrace Python 3 features and idioms
 
-The `p.dim() >= 2` heuristic is the key insight: weight matrices are 2D, biases and layer norm parameters are 1D. This avoids maintaining an explicit list of parameter names.
+## Platform Compatibility
 
-## Closures for Deferred Computation
+Handles cross-platform concerns directly:
 
-In micrograd, closures capture the backward pass logic at the time each operation is constructed. Each operator overload creates a `_backward` closure that references the operands via Python's lexical scoping: [c7a2d1b](https://github.com/karpathy/micrograd/commit/c7a2d1b)
+- Uses `sys.platform` conditionals for platform-specific behavior rather than abstraction libraries (d4798e3b)
+- Writes device-agnostic PyTorch code for CPU/GPU compatibility
 
-```python
-def __add__(self, other):
-    out = Value(self.data + other.data, (self, other), '+')
-    def _backward():
-        self.grad += out.grad
-        other.grad += out.grad
-    out._backward = _backward
-    return out
-```
+## Educational Clarity
 
-This is an elegant use of Python's closure semantics — the `_backward` function captures `self`, `other`, and `out` from the enclosing scope. The entire autograd engine is built on this pattern, which is idiomatic Python but would require explicit function pointers and data structures in C.
+When writing educational code, the developer prioritizes clarity:
 
-## No Classes Where Functions Suffice
+- Removes unnecessary complexity like weight initialization and gradient clipping for teaching purposes (d26d9750, 4e0137dd)
+- Maintains readable, straightforward implementations over premature optimization
 
-Helper logic is implemented as module-level functions, not utility classes. In minbpe, `get_stats` and `merge` are standalone functions that operate on plain lists, not methods on a tokenizer class: [b7c1d5e](https://github.com/karpathy/minbpe/commit/b7c1d5e)
-
-```python
-def get_stats(ids):
-    counts = {}
-    for pair in zip(ids, ids[1:]):
-        counts[pair] = counts.get(pair, 0) + 1
-    return counts
-
-def merge(ids, pair, idx):
-    newids = []
-    i = 0
-    while i < len(ids):
-        if i < len(ids) - 1 and ids[i] == pair[0] and ids[i+1] == pair[1]:
-            newids.append(idx)
-            i += 2
-        else:
-            newids.append(ids[i])
-            i += 1
-    return newids
-```
-
-This keeps the functions testable, reusable, and readable without the cognitive overhead of class instantiation. Classes appear only when there is state to manage.
-
-## Python 3.7+ Baseline
-
-Code targets Python 3.7+ — uses dataclasses (3.7), f-strings (3.6), and walrus operator sparingly. No Python 3.10+ features like `match/case` or `X | Y` type unions. This maximizes compatibility without sacrificing modern syntax. [c9a4d2e](https://github.com/karpathy/nanoGPT/commit/c9a4d2e)
+This developer's Python style reflects deep language expertise, embracing both modern features and domain-specific patterns while maintaining code clarity and idiomatic correctness.

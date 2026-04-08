@@ -1,93 +1,43 @@
 ---
-title: "Testing"
-category: style
-confidence: medium
-sources: [torvalds/linux]
-related: [patterns, code-structure, commit-hygiene]
-last_updated: 2026-04-07
+title: Testing
+category: dimension
+confidence: 0.82
+source_repos:
+  - torvalds/1590A
+  - torvalds/AudioNoise
+  - torvalds/GuitarPedal
+  - torvalds/HunspellColorize
+  - torvalds/linux
+  - torvalds/pesconvert
+  - torvalds/test-tlb
+  - torvalds/uemacs
+last_updated: 2026-04-08
 ---
+The developer demonstrates a pragmatic and context-dependent approach to testing that varies significantly across different project types and domains.
 
-# Testing
+## Kernel Development Testing
 
-## Philosophy
+In kernel development contexts, the developer actively maintains and integrates self-tests within the kernel tree structure. They consistently include updates to `tools/testing/selftests/` alongside bug fixes and feature additions [85fb6da4, abacaf55, eb71ab2b, 453a4a5f, f8f5627a, 4660e168]. This pattern is particularly evident for complex subsystems like BPF and networking, where the developer integrates fixes that reference specific test failures and includes regression tests to prevent future issues [66d64899, f8f5627a, 85fb6da4].
 
-The kernel does not follow a traditional unit-test-driven development workflow, but it is not "untested." It has a deeply sophisticated verification culture that looks nothing like userspace pytest — the testing is adapted to the realities of a codebase that manages hardware, concurrency, and millions of configurations simultaneously. [d4f2a8c](https://github.com/torvalds/linux/commit/d4f2a8c)
+The developer also references external validation tools like valgrind in [[commit-hygiene|commit messages]] [9be85a9b, fa00fe88], though they don't typically include automated tests directly in commits. This suggests a workflow where testing happens outside the main repository but informs the development process.
 
-The core insight: most kernel bugs are concurrency bugs, memory safety bugs, or configuration-dependent build failures. Traditional unit tests catch none of these effectively. The kernel's testing strategy focuses on runtime dynamic analysis, fuzzing, and making `git bisect` work reliably.
+## Performance and Benchmarking Focus
 
-## Runtime Dynamic Analysis
+For performance-critical code, the developer favors benchmarking and statistical analysis over traditional unit tests. They implement performance testing with emphasis on statistical validity through multiple runs and minimum selection strategies [4ac62b97, 16e929a5, fba59060]. This approach prioritizes measuring real-world performance characteristics rather than isolated unit behavior.
 
-The kernel's most powerful testing tools are compile-time-selectable runtime checkers, enabled via `CONFIG_*` flags. These instruments are built into the kernel itself and catch bugs during normal operation or stress testing:
+## Domain-Specific Testing Approaches
 
-- **KASAN** (Kernel Address Sanitizer): Detects use-after-free, out-of-bounds, and other memory safety bugs. Inserts shadow memory tracking at compile time. Has found thousands of bugs since its introduction.
-- **KCSAN** (Kernel Concurrency Sanitizer): Detects data races in concurrent code. Uses a sampling-based approach — it watchpoints memory accesses and reports unsynchronized conflicting accesses.
-- **UBSAN** (Undefined Behavior Sanitizer): Catches signed integer overflow, alignment violations, and other undefined behavior at runtime.
-- **lockdep**: Tracks lock acquisition order and detects potential deadlocks, even if the deadlock path has never actually triggered. See [[patterns]] for locking discipline details.
-- **KMEMLEAK**: Scans memory for unreferenced allocations, functioning as a kernel-space leak detector.
+### Audio and Signal Processing
+In audio processing projects, the developer relies heavily on manual testing with audio playback and visualization tools rather than formal unit tests [1c3e8c3b, ea71138d, 4cfbb04c]. They create example targets in [[makefile|Makefiles]] that build and play audio effects, treating the audible output as the primary validation mechanism [1c3e8c3b, 4cfbb04c, 316f2559].
 
-These are not optional niceties — maintainers of core subsystems are expected to test with these enabled. [e8c1a5b](https://github.com/torvalds/linux/commit/e8c1a5b)
+### Hardware and Circuit Design
+For hardware-related projects, the developer demonstrates strong commitment to simulation-based testing. They heavily rely on SPICE simulations before physical implementation, with detailed simulation setups including transient analysis, AC analysis, and custom test signals [eb0d867a, 5c6c230f, e7c38a0b, 596bd272, 88673d25]. This reflects a disciplined approach to validating designs before committing to physical implementation.
 
-## Fuzzing via syzkaller
+### Mathematical Functions
+When implementing mathematical functions, the developer creates dedicated test programs with error analysis. These test executables typically follow a `test_` prefix naming convention and are integrated into [[makefile|Makefile]] test targets [d999fef1, b07bfc4d].
 
-The syzkaller fuzzer generates random syscall sequences and runs them against the kernel, triggering code paths that human testers would never reach. It has been the single most productive bug-finding tool in the kernel ecosystem, discovering hundreds of security-relevant bugs per year. Bugs are reported automatically to the kernel mailing list with reproducers.
+## Pragmatic Testing Philosophy
 
-The kernel's error-handling paths — the `goto err_*` cleanup sequences described in [[patterns]] — are especially well-exercised by fuzzing, because fuzzers naturally trigger error conditions that normal workloads rarely hit.
+Across several projects, the developer exhibits a pragmatic "good enough for testing" approach [87c358bf, 0d99d1c8, bc93b501]. They appear to prioritize practical validation over comprehensive test coverage, focusing testing efforts where they provide the most value for the specific domain.
 
-## CI: 0-day Bot and Kernel Test Robot
-
-Intel's 0-day bot (now the kernel test robot) builds every patch posted to the mailing list across dozens of architecture and configuration combinations. It catches:
-
-- Build failures on obscure architectures
-- New compiler warnings (the kernel builds with `-Werror` on many configurations)
-- Boot failures in QEMU
-- Performance regressions via automated benchmarks
-
-This automated infrastructure means that many bugs are caught before code reaches Torvalds' tree.
-
-## In-Tree Test Suites
-
-The `tools/testing/selftests/` directory contains selftests that exercise the kernel's userspace-facing interfaces. They focus on areas where the contract is well-defined:
-
-- **Syscall interfaces**: New syscalls require corresponding selftests
-- **eBPF verifier**: Selftest coverage is enforced by the BPF maintainer
-- **Memory management**: mm selftests exercise page allocation, mmap, and hugepage behavior
-- **Networking**: netfilter, tc, and socket option selftests
-
-KUnit (`lib/kunit/`) was merged for in-kernel unit testing. Adoption is gradual — Torvalds has accepted KUnit patches pragmatically, and it is most useful for testing self-contained algorithms (like the rbtree or sort implementations) where isolation from hardware is straightforward.
-
-## Bisectability as Testing
-
-Commits are required to be individually buildable and bootable — see [[commit-hygiene]]. This makes `git bisect` an effective debugging tool, which is itself a form of testing discipline. When a regression is reported, bisect narrows it to a single commit, and that commit's author is responsible for the fix. Torvalds has reverted entire patch series when a single commit broke bisectability. [a7b3c9e](https://github.com/torvalds/linux/commit/a7b3c9e)
-
-## When Tests Are Required
-
-Test additions are expected for:
-- New syscall interfaces (selftests mandatory)
-- eBPF verifier changes (selftest coverage enforced by maintainer)
-- Core memory management changes (mm selftests)
-- New KUnit-testable algorithms or data structures
-
-Tests are not typically required for driver code, filesystem internals, or architecture-specific changes. The burden of proof shifts depending on the subsystem and the risk of the change.
-
-## Static Analysis
-
-Beyond runtime tools, the kernel uses static analysis to catch bugs before code runs:
-
-- **Sparse**: The kernel's own static checker, catching address-space misuse (`__user`, `__iomem`, `__rcu`) and endianness bugs (`__le32`/`__be32`). See [[type-discipline]] for how sparse annotations create distinct type spaces.
-- **Coccinelle**: A semantic patching tool used to find and fix API misuse patterns across the entire tree. Maintainers write Coccinelle scripts (`.cocci` files under `scripts/coccinelle/`) that detect common bugs like missing error checks, incorrect locking patterns, or deprecated API usage.
-- **Compiler warnings**: The kernel builds with an aggressive set of `-W` flags, and the push toward `-Werror` means compiler diagnostics function as automated reviewers. See [[comments-and-docs]] for how `-Werror` interacts with kernel-doc format enforcement.
-
-## BUILD_BUG_ON as Compile-Time Testing
-
-`BUILD_BUG_ON()` is used extensively for compile-time assertions — catching configuration errors, struct size mismatches, and invalid constant expressions before the kernel even boots. This is preferred over runtime assertions where the invariant can be checked statically. [c2d5a8f](https://github.com/torvalds/linux/commit/c2d5a8f)
-
-```c
-BUILD_BUG_ON(sizeof(struct page) > 64);  /* page struct must fit in a cacheline */
-BUILD_BUG_ON(ARRAY_SIZE(map) != NR_ENTRIES);  /* array and enum must stay in sync */
-```
-
-Related compile-time tools include `static_assert()` (C11) and `compiletime_assert()`, which serve similar purposes with different syntax.
-
-## Note on Confidence
-
-This article has **medium confidence** because testing practices are distributed across maintainer trees and CI infrastructure rather than visible in Torvalds' direct commit patterns. See [[_meta/sources]] for data coverage details.
+This context-dependent testing strategy aligns with their overall engineering style, where they adapt their approach based on the project's needs rather than following a one-size-fits-all testing methodology. The developer seems to view testing as a tool to achieve specific goals rather than an end in itself.

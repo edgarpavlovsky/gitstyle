@@ -90,7 +90,7 @@ class LLMClient:
         self,
         system: str,
         prompt: str,
-        max_tokens: int = 32768,
+        max_tokens: int = 16384,
         temperature: float = 0.2,
         retries: int = 1,
     ) -> dict | list:
@@ -104,7 +104,7 @@ class LLMClient:
             text = self.complete(system, prompt, current_max_tokens, temperature)
             # Detect truncation — if the model hit max_tokens, the JSON is incomplete
             if getattr(self, "_last_stop_reason", None) == "max_tokens" and attempt < retries:
-                current_max_tokens = min(current_max_tokens * 2, 65536)
+                current_max_tokens = min(current_max_tokens * 2, 32000)
                 continue
             extracted = self._extract_json_text(text)
             try:

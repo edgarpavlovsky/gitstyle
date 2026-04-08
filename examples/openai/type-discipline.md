@@ -1,114 +1,66 @@
 ---
-title: "Type Discipline"
-category: style
-confidence: high
-sources: [openai/openai-python, openai/openai-node, openai/tiktoken, openai/whisper, openai/CLIP, openai/gym]
-related: [naming-conventions, patterns, languages/python, languages/typescript]
-last_updated: 2026-04-07
+title: Type Discipline
+category: dimension
+confidence: 0.92
+source_repos:
+  - openai/CLIP
+  - openai/DALL-E
+  - openai/baselines
+  - openai/chatgpt-retrieval-plugin
+  - openai/codex
+  - openai/codex-plugin-cc
+  - openai/consistency_models
+  - openai/evals
+  - openai/gpt-2
+  - openai/gpt-3
+  - openai/gpt-oss
+  - openai/guided-diffusion
+  - openai/gym
+  - openai/jukebox
+  - openai/openai-agents-python
+  - openai/openai-cookbook
+  - openai/openai-cs-agents-demo
+  - openai/openai-node
+  - openai/openai-python
+  - openai/openai-realtime-agents
+  - openai/parameter-golf
+  - openai/point-e
+  - openai/shap-e
+  - openai/skills
+  - openai/spinningup
+  - openai/swarm
+  - openai/symphony
+  - openai/tiktoken
+  - openai/universe
+  - openai/whisper
+last_updated: 2026-04-08
 ---
+The developer demonstrates strong type discipline across multiple languages, with a clear preference for compile-time type safety and explicit type annotations wherever the language supports them.
 
-# Type Discipline
+## Rust
 
-## SDK: Full Static Typing via Stainless
+The developer shows exceptional type discipline in [[rust]], consistently preferring custom wrapper types over primitive types to encode invariants at compile time. A prime example is their systematic use of `AbsolutePathBuf` instead of raw `PathBuf` for path handling [35b5720e, e9702411]. This pattern appears repeatedly across the codebase, indicating a deep commitment to making illegal states unrepresentable through the type system.
 
-The Python SDK achieves near-complete type coverage through code generation. Every API response is a Pydantic `BaseModel` with fully annotated fields. Every request parameter set is a `TypedDict` with `Required[]` and `NotRequired[]` markers. Return types are explicit on all public methods. This level of discipline is a property of the Stainless generator, not hand-maintained. [a3f7e21](https://github.com/openai/openai-python/commit/a3f7e21)
+## Python
 
-```python
-class ChatCompletion(BaseModel):
-    id: str
-    choices: List[Choice]
-    created: int
-    model: str
-    object: Literal["chat.completion"]
-    system_fingerprint: Optional[str] = None
-    usage: Optional[CompletionUsage] = None
+In [[python]], the developer extensively uses type annotations, including advanced features from the `typing` module. They consistently annotate function signatures with complex types like `Union`, `Optional`, `TypeVar`, and `Protocol` [63ea5f25, 0bcd49ec, d8187505]. The developer frequently uses `TypedDict` for structured data [6e772ae7, cd72fba3] and employs `TYPE_CHECKING` guards to handle circular imports [1c0ff599, 976bcced].
 
-class Choice(BaseModel):
-    finish_reason: Literal["stop", "length", "tool_calls", "content_filter"]
-    index: int
-    message: ChatCompletionMessage
-    logprobs: Optional[ChoiceLogprobs] = None
-```
+They also leverage Pydantic models for runtime validation [7ae87dee, bbb9d1eb] and consistently use `from __future__ import annotations` for forward references [3baf14ce, 86630ca1]. However, there's some inconsistency in older code where type annotations are minimal or absent [9b68103b, 6c44fb28], suggesting an evolution in their typing practices over time.
 
-The `Literal` types for string enums enable exhaustive pattern matching in type checkers. [b5d3a72](https://github.com/openai/openai-python/commit/b5d3a72)
+## TypeScript/JavaScript
 
-## SDK: Generic Types for Streaming
+The developer maintains strong type discipline in [[typescript]], extensively using interfaces, discriminated unions, and generic types [fb3dcfde, 06d88b7e]. They define explicit interfaces for API contracts and component props [8ad76b28, c160eb97], though occasionally resort to `any` type with eslint-disable comments when necessary [d6bd1a52].
 
-`Stream[ChatCompletionChunk]` and `AsyncStream[ChatCompletionChunk]` carry the chunk type through to the consumer. Method overloads handle type branching based on the `stream` parameter, so `mypy` and `pyright` narrow the return type statically. [c7a3e18](https://github.com/openai/openai-python/commit/c7a3e18)
+## Elixir
 
-```python
-@overload
-def create(self, *, stream: Literal[False] = ..., **kwargs) -> ChatCompletion: ...
-@overload
-def create(self, *, stream: Literal[True], **kwargs) -> Stream[ChatCompletionChunk]: ...
-@overload
-def create(self, *, stream: bool, **kwargs) -> ChatCompletion | Stream[ChatCompletionChunk]: ...
-```
+In [[elixir]], the developer consistently uses `@spec` annotations for all public functions, including detailed type specifications and custom types [ff65c7c7, e65f5eea, c9ec3f15]. This shows their commitment to type documentation even in dynamically typed languages.
 
-## SDK: TypedDict for Request Parameters
+## C/C++/Metal
 
-Request parameters use `TypedDict` rather than Pydantic models, avoiding the need to construct model instances for every API call. Users pass plain dicts that match the shape; the `TypedDict` provides type checking while keeping the call site ergonomic. [d2f1a93](https://github.com/openai/openai-python/commit/d2f1a93)
+For systems programming in [[c]], [[cplusplus]], and [[metal]], the developer uses explicit fixed-width integer types (`uint32_t`, `size_t`) and structures arguments through dedicated struct types for kernel parameters [bbc5c482, cf427a62]. This approach ensures type safety at API boundaries.
 
-```python
-class CompletionCreateParams(TypedDict, total=False):
-    messages: Required[List[ChatCompletionMessageParam]]
-    model: Required[Union[str, Literal["gpt-4", "gpt-4o", "gpt-3.5-turbo"]]]
-    frequency_penalty: Optional[float]
-    max_tokens: Optional[int]
-    temperature: Optional[float]
-```
+## Runtime Type Checking
 
-## Node SDK: Strict TypeScript Types
+Interestingly, the developer also employs runtime type checking strategies, particularly in machine learning code. They add assertions to validate tensor shapes and types [68a08136, d89f2e34], and carefully handle dtype conversions for PyTorch tensors [86dac6da, 3d86141c].
 
-openai-node mirrors the Python SDK's strictness using TypeScript interfaces and discriminated unions. Response types use readonly properties; request types use optional fields with explicit `null` handling. See [[languages/typescript]] for TypeScript-specific patterns. [e1c8a37](https://github.com/openai/openai-node/commit/e1c8a37)
-
-## Research Code: Minimal Annotations
-
-Research repos occupy the opposite end of the spectrum. Whisper annotates selectively — `forward` methods have return types but parameters are often implicit. CLIP uses almost no annotations. [d4a1b38](https://github.com/openai/whisper/commit/d4a1b38)
-
-```python
-# whisper — annotations present but selective
-class AudioEncoder(nn.Module):
-    def forward(self, x: Tensor) -> Tensor:
-        x = F.gelu(self.conv1(x))
-        ...
-
-# CLIP — mostly unannotated
-class CLIP(nn.Module):
-    def encode_image(self, image):
-        return self.visual(image.type(self.dtype))
-```
-
-The contrast is stark: SDK code achieves 100% annotation coverage via generation, while research code annotates only where it aids readability (typically `Tensor` return types). Neither research repo runs `mypy` in CI. This is the widest typing gap in any org analyzed by gitstyle — most organizations cluster around one end of the spectrum or the other, but OpenAI inhabits both extremes simultaneously.
-
-## tiktoken: Type Stubs Bridging the Rust Boundary
-
-tiktoken provides `.pyi` stub files for its Rust-compiled core, making Rust's type safety visible to Python tooling. This is the cleanest example in the org of typed FFI — the Rust implementation is strongly typed, and the stubs project that information into the Python type system. [a4e2f91](https://github.com/openai/tiktoken/commit/a4e2f91)
-
-```python
-# tiktoken/_tiktoken.pyi
-class CoreBPE:
-    def encode_ordinary(self, text: str) -> list[int]: ...
-    def encode(self, text: str, allowed_special: set[str]) -> list[int]: ...
-    def decode_bytes(self, tokens: list[int]) -> bytes: ...
-```
-
-## gym: Protocol-Style Interfaces (Pre-Protocol Era)
-
-Gym's `Env` base class predates Python's `Protocol` type but functions as one, defining the expected interface through concrete methods that raise `NotImplementedError`. The `step()` return type — a 5-tuple of `(observation, reward, terminated, truncated, info)` — is one of the most precisely typed signatures in the research codebase, because downstream RL algorithms depend on this exact shape. [f1a9d52](https://github.com/openai/gym/commit/f1a9d52)
-
-```python
-class Env:
-    observation_space: Space
-    action_space: Space
-
-    def step(self, action) -> Tuple[ObsType, float, bool, bool, dict]:
-        raise NotImplementedError
-
-    def reset(self) -> Tuple[ObsType, dict]:
-        raise NotImplementedError
-```
-
-## Validation: Pydantic in SDKs, Asserts in Research
-
-SDK validation leverages Pydantic's validators — invalid API responses raise `pydantic.ValidationError` with field-level messages. Research code uses bare `assert` statements for precondition checking. The org accepts this divergence: production code gets strict runtime validation, research code gets lightweight assertions. [e5b7c41](https://github.com/openai/openai-python/commit/e5b7c41)
+The developer's type discipline extends beyond just adding annotations — they actively refactor code to use stronger types, fix type mismatches, and ensure type correctness across language boundaries. This systematic approach to type safety appears to be a core principle in their [[code-structure]] and contributes to their overall engineering philosophy.

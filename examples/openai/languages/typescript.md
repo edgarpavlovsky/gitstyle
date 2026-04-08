@@ -1,145 +1,60 @@
 ---
-title: "TypeScript Idioms"
+title: TypeScript Style
 category: language
-confidence: high
-sources: [openai/openai-node]
-related: [naming-conventions, type-discipline, patterns, dependencies]
-last_updated: 2026-04-07
+confidence: 0.87
+source_repos:
+  - openai/CLIP
+  - openai/DALL-E
+  - openai/baselines
+  - openai/chatgpt-retrieval-plugin
+  - openai/codex
+  - openai/codex-plugin-cc
+  - openai/consistency_models
+  - openai/evals
+  - openai/gpt-2
+  - openai/gpt-3
+  - openai/gpt-oss
+  - openai/guided-diffusion
+  - openai/gym
+  - openai/jukebox
+  - openai/openai-agents-python
+  - openai/openai-cookbook
+  - openai/openai-cs-agents-demo
+  - openai/openai-node
+  - openai/openai-python
+  - openai/openai-realtime-agents
+  - openai/parameter-golf
+  - openai/point-e
+  - openai/shap-e
+  - openai/skills
+  - openai/spinningup
+  - openai/swarm
+  - openai/symphony
+  - openai/tiktoken
+  - openai/universe
+  - openai/whisper
+last_updated: 2026-04-08
 ---
+The developer demonstrates mastery of modern TypeScript idioms and features, consistently leveraging the language's type system for safety and expressiveness.
 
-# TypeScript Idioms
+## Type System Usage
 
-## Stainless-Generated Architecture
+The codebase extensively uses TypeScript's advanced type features for compile-time safety. Discriminated unions appear frequently for type-safe message handling (fb3dcfde, 06d88b7e, ea516f9a), providing exhaustive pattern matching capabilities. The developer employs conditional types and template literal types to create precise type constraints (e67a4fc5, 78d2abf0, 0064618a), demonstrating deep understanding of TypeScript's type system.
 
-openai-node is Stainless-generated and shares architectural DNA with the Python SDK. The TypeScript idioms here are largely prescribed by the generator, but they represent the patterns OpenAI ships to production users. [e1c8a37](https://github.com/openai/openai-node/commit/e1c8a37)
+Type guards are implemented to narrow types at runtime (8ad76b28, e2b122f0), ensuring type safety extends beyond compile time. The consistent use of type imports (7e610529, 31d1cfc9) shows attention to module organization and compilation efficiency.
 
-## Resource Classes with Method Overloads
+## Modern JavaScript Features
 
-Each API resource is a class with typed methods. The overload pattern mirrors Python's `@overload` — the `stream` parameter value determines the return type at the type level. [e1c8a37](https://github.com/openai/openai-node/commit/e1c8a37)
+The developer embraces ES2020+ features throughout the codebase. Optional chaining (`?.`) and nullish coalescing (`??`) operators appear consistently for safe property access and default value handling (b80e2270, fa900358, 9d8bb994, d5b92e44). This [[language-idioms]] approach reduces boilerplate null checks while maintaining safety.
 
-```typescript
-export class Completions extends APIResource {
-  create(
-    body: ChatCompletionCreateParamsNonStreaming,
-    options?: Core.RequestOptions,
-  ): APIPromise<ChatCompletion>;
-  create(
-    body: ChatCompletionCreateParamsStreaming,
-    options?: Core.RequestOptions,
-  ): APIPromise<Stream<ChatCompletionChunk>>;
-  create(
-    body: ChatCompletionCreateParams,
-    options?: Core.RequestOptions,
-  ): APIPromise<ChatCompletion> | APIPromise<Stream<ChatCompletionChunk>> {
-    return this._client.post('/chat/completions', { body, ...options, stream: body.stream ?? false });
-  }
-}
-```
+Async/await patterns are the standard for asynchronous operations (7e610529, 31d1cfc9, e67a4fc5), replacing older callback or promise-chaining approaches. Destructuring assignment and spread operators are used idiomatically for object and array manipulation (fa900358, 9d8bb994, b80e2270).
 
-## Discriminated Unions for Polymorphic Responses
+## React Integration
 
-Response types use discriminated unions where the API returns polymorphic objects. The `role` field discriminates message types, allowing `switch(message.role)` to narrow the type. [f4b2a19](https://github.com/openai/openai-node/commit/f4b2a19)
+In React components, the developer consistently uses functional components with hooks rather than class components (43958741, aeb92f49, 8b2e94f8, 7f9ed9f3). This modern React approach aligns with current best practices and TypeScript's type inference capabilities.
 
-```typescript
-export type ChatCompletionMessageParam =
-  | ChatCompletionSystemMessageParam
-  | ChatCompletionUserMessageParam
-  | ChatCompletionAssistantMessageParam
-  | ChatCompletionToolMessageParam;
+## Code Organization
 
-export interface ChatCompletionSystemMessageParam {
-  role: 'system';
-  content: string;
-}
+The [[code-structure]] reflects TypeScript best practices with clear separation of types, interfaces, and implementation. The consistent use of modern syntax features suggests a codebase that targets recent TypeScript versions, taking full advantage of language improvements.
 
-export interface ChatCompletionUserMessageParam {
-  role: 'user';
-  content: string | Array<ChatCompletionContentPart>;
-}
-```
-
-## Namespace-Based Type Organization
-
-Types are organized using TypeScript namespaces mirroring the resource hierarchy, supporting both `OpenAI.Chat.Completions.ChatCompletion` as a fully qualified path and direct imports. [e1c8a37](https://github.com/openai/openai-node/commit/e1c8a37)
-
-## AsyncIterable for Streaming
-
-Streaming responses implement `AsyncIterable`, enabling `for await...of` consumption. The `Stream` class also exposes `.controller` for `AbortController` integration and `.toReadableStream()` for Web Streams API compatibility. [c9a1e72](https://github.com/openai/openai-node/commit/c9a1e72)
-
-```typescript
-const stream = await client.chat.completions.create({
-  model: 'gpt-4',
-  messages: [{ role: 'user', content: 'Count to 10' }],
-  stream: true,
-});
-for await (const chunk of stream) {
-  process.stdout.write(chunk.choices[0]?.delta?.content || '');
-}
-```
-
-## Error Hierarchy Mirroring Python
-
-The error classes mirror the Python SDK exactly. Each extends `APIError` with typed `status`, `error`, and `message` properties. [d7e3b28](https://github.com/openai/openai-node/commit/d7e3b28)
-
-```typescript
-export class APIError extends Error {
-  readonly status: number | undefined;
-  readonly error: Object | undefined;
-}
-export class AuthenticationError extends APIError { readonly status: 401; }
-export class RateLimitError extends APIError { readonly status: 429; }
-```
-
-## Options Object Pattern
-
-Every method accepts an optional `RequestOptions` last argument for per-request transport configuration (timeouts, headers, abort signals), keeping API parameter types clean of transport concerns. [e1c8a37](https://github.com/openai/openai-node/commit/e1c8a37)
-
-```typescript
-interface RequestOptions {
-  headers?: Headers;
-  maxRetries?: number;
-  timeout?: number;
-  signal?: AbortSignal;
-  httpAgent?: Agent;
-}
-
-await client.chat.completions.create(
-  { model: 'gpt-4', messages: [...] },
-  { timeout: 30000, signal: controller.signal }
-);
-```
-
-## Strict Compilation, No `any`
-
-The SDK compiles with `strict: true` including `strictNullChecks`. The codebase avoids `any` — genuinely unknown types use `unknown` instead. [f4b2a19](https://github.com/openai/openai-node/commit/f4b2a19)
-
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "target": "ES2018",
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "declaration": true
-  }
-}
-```
-
-## Dual CJS/ESM Output
-
-openai-node ships both CommonJS and ES Module builds via conditional exports in `package.json`. [a2d8c13](https://github.com/openai/openai-node/commit/a2d8c13)
-
-```json
-{
-  "exports": {
-    ".": {
-      "import": "./dist/esm/index.js",
-      "require": "./dist/cjs/index.js"
-    }
-  }
-}
-```
-
-## Runtime Environment Detection
-
-The SDK detects its runtime (Node.js, Deno, Bun, Cloudflare Workers, Vercel Edge) and adjusts behavior — native `fetch` in edge environments, `node-fetch` in older Node.js. Detection happens at import time. [c9a1e72](https://github.com/openai/openai-node/commit/c9a1e72)
+This TypeScript style emphasizes type safety, modern syntax, and idiomatic patterns that leverage the language's strengths while maintaining readability and maintainability.

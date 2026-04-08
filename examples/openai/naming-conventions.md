@@ -1,93 +1,76 @@
 ---
-title: "Naming Conventions"
-category: style
-confidence: high
-sources: [openai/openai-python, openai/openai-node, openai/tiktoken, openai/whisper, openai/CLIP, openai/gym]
-related: [code-structure, type-discipline, languages/python, languages/typescript]
-last_updated: 2026-04-07
+title: Naming Conventions
+category: dimension
+confidence: 0.92
+source_repos:
+  - openai/CLIP
+  - openai/DALL-E
+  - openai/baselines
+  - openai/chatgpt-retrieval-plugin
+  - openai/codex
+  - openai/codex-plugin-cc
+  - openai/consistency_models
+  - openai/evals
+  - openai/gpt-2
+  - openai/gpt-3
+  - openai/gpt-oss
+  - openai/guided-diffusion
+  - openai/gym
+  - openai/jukebox
+  - openai/openai-agents-python
+  - openai/openai-cookbook
+  - openai/openai-cs-agents-demo
+  - openai/openai-node
+  - openai/openai-python
+  - openai/openai-realtime-agents
+  - openai/parameter-golf
+  - openai/point-e
+  - openai/shap-e
+  - openai/skills
+  - openai/spinningup
+  - openai/swarm
+  - openai/symphony
+  - openai/tiktoken
+  - openai/universe
+  - openai/whisper
+last_updated: 2026-04-08
 ---
+The developer demonstrates strong consistency in naming conventions across multiple programming languages, adapting appropriately to each language's idioms while maintaining clear, descriptive names throughout their codebase.
 
-# Naming Conventions
+## Language-Specific Patterns
 
-## SDK Resource Names Mirror API Endpoints
+### Python
+The developer strictly follows PEP 8 naming conventions in [[python]] code. Functions and variables consistently use snake_case [ba3f3cd5, 6ed314fe, e5eabc6f], while classes use PascalCase [2d471951, f95a5fe2]. File names also follow snake_case convention [b28ddce5, b3459b11]. The developer shows a strong preference for descriptive, verbose names that clearly indicate purpose, such as `image_generation_tool_auth_allowed` [e003f84e], `resolve_workdir_base_path` [e794457a], and `_truncate_json_value_for_limit` [fb67680f].
 
-Class names map directly to REST paths: `client.chat.completions.create()` hits `POST /chat/completions`. Resource classes are plural nouns (`Completions`, `Embeddings`, `Files`), nested resources use dot access (`client.fine_tuning.jobs`). This Stripe-inherited convention, enforced by the Stainless generator, means developers can guess the method call from the API docs. [a3f7e21](https://github.com/openai/openai-python/commit/a3f7e21)
+Private methods are consistently prefixed with underscores [b1c4b6be, c373d9b9], following Python conventions for indicating internal implementation details.
 
-```python
-class Completions(SyncAPIResource):
-    def create(self, ...) -> ChatCompletion: ...    # POST /chat/completions
+### Rust
+In [[rust]] code, the developer adheres strictly to Rust naming conventions with snake_case for functions, variables, and module names [e003f84e, 35b5720e, 413c1e1f], and PascalCase for types and structs [e794457a]. Examples include `build_sandbox_command` [35b5720e] and `ThreadRealtimeSdpNotification` [e794457a].
 
-class Files(SyncAPIResource):
-    def create(self, ...) -> FileObject: ...         # POST /files
-    def retrieve(self, file_id: str) -> FileObject: ...  # GET /files/{file_id}
-```
+### TypeScript/JavaScript
+For [[typescript]] and [[javascript]], the developer follows standard conventions with camelCase for variables and functions, PascalCase for types, interfaces, and components [8ad76b28, e67a4fc5, 6f5f0de6]. File names typically use kebab-case [d90a3488, 43958741]. Constants use SCREAMING_SNAKE_CASE [11a720b7].
 
-## CRUD Method Vocabulary
+### C/C++
+In [[c]] and [[cplusplus]] code, the developer uses a consistent prefix pattern with `gptoss_` for public API functions and `GPTOSS_` for macros [bbc5c482, cf427a62, 9ffdd14b]. This namespace-like approach provides clear API boundaries and prevents naming conflicts.
 
-OpenAI standardizes on five verbs: `create`, `retrieve`, `list`, `delete`, `update`. Never `get`, never `fetch`, never `remove`. This vocabulary is enforced by Stainless and identical to Stripe's convention. [b8c4d19](https://github.com/openai/openai-python/commit/b8c4d19)
+### Other Languages
+The developer adapts appropriately to other language conventions:
+- [[elixir]]: snake_case for functions/variables, CamelCase for modules [ff65c7c7, 1f86bac5]
+- [[shell]]: lowercase with underscores for variables [4bfc1f58, 5b84993b]
+- Directory names: kebab-case for multi-word names [0e7823cc, 5c8f1e26]
 
-## Type Names: Response Objects as Nouns
+## Cross-Language Patterns
 
-Pydantic types in `openai/types/` use noun phrases describing the API object: `ChatCompletion`, `ChatCompletionChunk`, `Embedding`, `FileObject`. Request parameter types follow `{Resource}CreateParams`. File names are snake_case mirrors: `chat_completion.py` contains `ChatCompletion`. [c2e9a47](https://github.com/openai/openai-python/commit/c2e9a47)
+Several consistent patterns emerge across languages:
 
-```python
-# types/chat/chat_completion.py
-class ChatCompletion(BaseModel):
-    id: str
-    choices: List[Choice]
-    model: str
-    usage: Optional[CompletionUsage]
+1. **Descriptive Clarity**: Names clearly indicate purpose and functionality, avoiding cryptic abbreviations [35b5720e, fb67680f, 830f9b65]
 
-# types/chat/completion_create_params.py
-class CompletionCreateParams(TypedDict):
-    messages: Required[List[ChatCompletionMessageParam]]
-    model: Required[str]
-```
+2. **Action Prefixes**: Functions often start with verbs indicating their action: `test_`, `get_`, `create_`, `build_`, `resolve_` [fb67680f, 35b5720e, 45a8058f]
 
-## Research Code: Domain-Standard Variable Names
+3. **Domain Prefixes**: Related functionality uses consistent prefixes for namespace-like organization [bbc5c482, ff65c7c7]
 
-Research repos follow ML paper conventions. Whisper uses `n_mels`, `n_audio_ctx`, `n_text_ctx` — the `n_` prefix for counts matching PyTorch community convention. CLIP uses `embed_dim`, `vision_layers`, `transformer_width`. [d4a1b38](https://github.com/openai/whisper/commit/d4a1b38)
+4. **Test Files**: Test files consistently use `test_` prefix or `_test` suffix depending on language conventions [fb67680f, ff65c7c7]
 
-```python
-# whisper/model.py
-@dataclass
-class ModelDimensions:
-    n_mels: int
-    n_audio_ctx: int
-    n_audio_state: int
-    n_audio_head: int
-    n_audio_layer: int
-    n_vocab: int
-    n_text_ctx: int
-    n_text_state: int
-    n_text_head: int
-    n_text_layer: int
-```
+The developer's naming approach strongly emphasizes readability and self-documentation, preferring longer, more descriptive names over terse abbreviations. This pattern holds true even in performance-critical code, suggesting the developer values code clarity and maintainability.
 
-Single-letter tensor dimension variables (`B`, `T`, `C`, `N`) appear frequently in forward passes, consistent with the ML community but absent from SDK code.
-
-## gym: Verb-Based Interface Methods
-
-Gym's `Env` uses imperative verbs: `step`, `reset`, `render`, `close`, `seed`. Wrapper classes follow `{Concept}Wrapper` naming. Space classes are nouns describing the shape: `Box`, `Discrete`, `MultiBinary`, `Tuple`, `Dict`. [f1a9d52](https://github.com/openai/gym/commit/f1a9d52)
-
-```python
-class Env:
-    def step(self, action): ...
-    def reset(self): ...
-    def render(self, mode='human'): ...
-    def close(self): ...
-```
-
-These names became the de facto vocabulary for the entire RL ecosystem — `step`, `reset`, and `observation_space` are as universal in RL code as `forward` and `backward` are in deep learning.
-
-## tiktoken: Function-Centric Public API
-
-tiktoken exposes top-level functions rather than classes: `tiktoken.encoding_for_model("gpt-4")`, `tiktoken.get_encoding("cl100k_base")`. Implementation classes use underscore prefixes (`_CoreBPE`). Rust-side names use snake_case per Rust convention: `byte_pair_encode`, `_byte_pair_merge`. [a4e2f91](https://github.com/openai/tiktoken/commit/a4e2f91)
-
-## Private Prefixes: Underscore Convention
-
-The single underscore consistently marks internal APIs across the org. In openai-python: `_client.py`, `_streaming.py`, `_response.py`. In tiktoken: `_educational.py`. The public API surface is intentionally small, with implementation details underscore-gated. [b5d3a72](https://github.com/openai/openai-python/commit/b5d3a72)
-
-## Constants
-
-Standard Python `UPPER_SNAKE_CASE` throughout. Whisper: `SAMPLE_RATE = 16000`, `N_FFT = 400`, `HOP_LENGTH = 160`. tiktoken: `ENDOFTEXT`, `FIM_PREFIX`, `FIM_MIDDLE`. SDKs: `DEFAULT_TIMEOUT`, `DEFAULT_MAX_RETRIES`. [e7f2c83](https://github.com/openai/whisper/commit/e7f2c83)
+This naming discipline extends to [[commit-hygiene]] where commit messages likely follow similar clarity principles, and supports the developer's approach to [[comments-and-docs]] by making code more self-documenting through clear naming choices.

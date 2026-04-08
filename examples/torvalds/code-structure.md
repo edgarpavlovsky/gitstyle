@@ -1,55 +1,42 @@
 ---
-title: "Code Structure"
-category: style
-confidence: high
-sources: [torvalds/linux]
-related: [naming-conventions, patterns, dependencies]
-last_updated: 2026-04-07
+title: Code Structure
+category: dimension
+confidence: 0.9
+source_repos:
+  - torvalds/1590A
+  - torvalds/AudioNoise
+  - torvalds/GuitarPedal
+  - torvalds/HunspellColorize
+  - torvalds/linux
+  - torvalds/pesconvert
+  - torvalds/test-tlb
+  - torvalds/uemacs
+last_updated: 2026-04-08
 ---
+The developer demonstrates distinct structural preferences that vary significantly based on project context and scale.
 
-# Code Structure
+## Modular vs Monolithic Approaches
 
-## Flat Subsystem Hierarchies
+The developer shows a strong dichotomy in structural choices. For kernel and driver development, they strictly adhere to hierarchical subsystem organization with clear boundaries between components [3036cd0d, 86782c16, 66d64899]. Driver code follows consistent patterns like `drivers/net/ethernet/vendor/model.c` [bfe62a45, f8f5627a, 453a4a5f]. Each subsystem maintains dedicated maintainers and minimal cross-subsystem changes within single commits [85fb6da4, abacaf55].
 
-The kernel source tree uses a deliberately shallow directory structure. Subsystems live at the top level (`mm/`, `fs/`, `net/`, `drivers/`, `kernel/`) with at most one or two levels of nesting beneath. Deep directory trees are treated as a code smell indicating unclear ownership boundaries. [f4e3d2c](https://github.com/torvalds/linux/commit/f4e3d2c)
+Conversely, for smaller utilities and focused tools, the developer strongly prefers single-file programs with all functionality contained in one [[c]] file [bf9779cf, cea02218, fba59060]. This monolithic approach extends even as complexity grows [bc93b501, d2f2439e, 87c358bf], with internal organization handled through static functions rather than separate modules.
 
-Merge commits that reorganize subsystem boundaries show a consistent preference for moving files up rather than creating new intermediate directories. A refactor of the block layer in v5.14 flattened three levels of nesting into a single `block/` directory with clearly named files. [a1b8c3e](https://github.com/torvalds/linux/commit/a1b8c3e)
+## Header-Only Architecture
 
-The flatness serves a practical purpose beyond aesthetics: maintainer ownership maps cleanly to top-level directories. The `MAINTAINERS` file uses path patterns to assign reviewers, and shallow hierarchies make those patterns simpler and less ambiguous.
+A distinctive pattern emerges in audio effect implementations, where the developer consistently uses header-only designs with inline functions [6a6daef2, f434a0e2, 1c3e8c3b]. Each effect gets its own `.h` file (flanger.h, echo.h, fm.h) following modular principles while avoiding separate compilation units [c9098c2c, 2f3c1c07, b07bfc4d]. This approach balances modularity with simplicity.
 
-## Clear Subsystem Boundaries
+## Incremental Development
 
-Each subsystem owns its headers, its implementation files, and its Kconfig/Makefile fragments. Cross-subsystem includes are minimized — subsystems expose a narrow public API through `include/linux/` and keep internal headers private under their own directory. See [[dependencies]] for the in-tree-only philosophy that reinforces this.
+The developer strongly favors incremental, focused changes over large refactorings [1c1b25ef, 1cdcf9df, 59df78a7]. When complexity grows, they extract functionality into dedicated files (like UTF-8 handling into utf8.c) [e62cdf04, 9be85a9b]. Version updates in [[makefile]]s receive minimal, targeted modifications [591cd656, 7aaa8047].
 
-```
-include/linux/sched.h      # public scheduler API
-kernel/sched/sched.h       # private scheduler internals
-kernel/sched/core.c        # implementation
-kernel/sched/fair.c        # CFS implementation
-```
+## Project Organization
 
-Module boundaries are enforced through `EXPORT_SYMBOL` and `EXPORT_SYMBOL_GPL`. Internal functions are `static`; anything exported is part of the subsystem's contract and changing it requires coordinating with all consumers. The `_GPL` variant restricts usage to GPL-licensed modules, creating a two-tier API surface that reflects both technical and legal boundaries. [e7f2a9d](https://github.com/torvalds/linux/commit/e7f2a9d)
+For hardware projects, the developer maintains consistent directory structures organized by form factor (1590A, 1590B, 1590LB, RP2354A) with modular subdirectories for specific boards [5cb15b29, 9f4c8cd5, 5eb65f87]. Schematics follow hierarchical organization with clear separation between base boards and effect boards [5c6c230f, e3660495].
 
-## Header Discipline
+Visualization tools implemented in [[python]] follow class-based organization with extensive matplotlib usage [4e524250, a63ddd7a], showing adaptability to language-specific [[patterns]].
 
-Headers are kept minimal. A header should declare the interface and nothing more — no inline function bodies unless performance-critical, no unnecessary includes. The `include/linux/` directory is treated as the kernel's public API surface. [b9c4f1a](https://github.com/torvalds/linux/commit/b9c4f1a)
+## Constants and Configuration
 
-Torvalds has repeatedly rejected patches that add transitive includes. Each `.c` file is expected to include exactly what it needs, not rely on headers pulling in other headers. This discipline keeps compile times manageable on a 30-million-line codebase. Forward declarations (`struct foo;`) are preferred over `#include` when only a pointer to the type is needed.
+The developer consistently uses `#define` constants for magic numbers and buffer sizes, organizing them in dedicated header files like `estruct.h` [1c1b25ef, 1cdcf9df, fa00fe88]. This practice extends across different project types, maintaining configuration clarity.
 
-## File Size Conventions
-
-Individual source files rarely exceed 3,000 lines. When a file grows beyond that, it gets split along functional boundaries — the scheduler split from a single `sched.c` into `sched/core.c`, `sched/fair.c`, `sched/rt.c` is the canonical example. See [[patterns]] for how callback structs enable this decomposition without breaking interfaces.
-
-The split criterion is functional cohesion, not arbitrary line counts. A 4,000-line file that implements a single coherent algorithm (like some crypto implementations) is acceptable; a 2,000-line file that mixes unrelated concerns is not.
-
-## Build System
-
-The kernel uses Kbuild (make-based) with per-directory Makefiles. Each subsystem's `Makefile` lists its objects and conditionally includes based on `CONFIG_*` symbols. There is zero tolerance for recursive make complexity beyond one level of `obj-y` / `obj-m` inclusion. [c9d1e4f](https://github.com/torvalds/linux/commit/c9d1e4f)
-
-Kconfig files define the configuration space, and the build system guarantees that any valid `.config` produces a buildable kernel. This constraint — every configuration must compile — is enforced by CI across hundreds of architecture/config combinations. See [[testing]] for how automated build testing catches violations.
-
-## init/exit Lifecycle
-
-Code that runs only during module initialization is annotated `__init` and placed in a special memory section that is freed after boot completes. Similarly, `__exit` marks code needed only during module unload. This convention turns the compiler and linker into memory management tools — hundreds of kilobytes of initialization code are automatically reclaimed once the system is running. See [[languages/c]] for the GCC attributes that implement this.
-
-Calling an `__init` function after init completes is a bug — the memory has been freed. The `__ref` annotation exists for the rare cases where post-init code must call init-time functions, and the build system warns on suspicious cross-section references.
+The structural choices reveal a pragmatic developer who adapts organization to project needs — highly modular for large systems, deliberately monolithic for focused utilities, with consistent attention to incremental development and clear boundaries.

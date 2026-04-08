@@ -1,88 +1,110 @@
 ---
-title: "Patterns & Architecture"
-category: style
-confidence: high
-sources: [karpathy/nanoGPT, karpathy/micrograd, karpathy/llm.c, karpathy/minbpe, karpathy/makemore]
-related: [code-structure, type-discipline, dependencies]
-last_updated: 2026-04-07
+title: Patterns
+category: dimension
+confidence: 0.9
+source_repos:
+  - karpathy/EigenLibSVM
+  - karpathy/KarpathyTalk
+  - karpathy/LLM101n
+  - karpathy/Random-Forest-Matlab
+  - karpathy/arxiv-sanity-lite
+  - karpathy/arxiv-sanity-preserver
+  - karpathy/autoresearch
+  - karpathy/build-nanogpt
+  - karpathy/calorie
+  - karpathy/char-rnn
+  - karpathy/convnetjs
+  - karpathy/covid-sanity
+  - karpathy/cryptos
+  - karpathy/deep-vector-quantization
+  - karpathy/find-birds
+  - karpathy/forestjs
+  - karpathy/hn-time-capsule
+  - karpathy/jobs
+  - karpathy/karpathy
+  - karpathy/karpathy.github.io
+  - karpathy/lecun1989-repro
+  - karpathy/llama2.c
+  - karpathy/llm-council
+  - karpathy/llm.c
+  - karpathy/makemore
+  - karpathy/micrograd
+  - karpathy/minGPT
+  - karpathy/minbpe
+  - karpathy/nanoGPT
+  - karpathy/nanochat
+  - karpathy/neuraltalk
+  - karpathy/neuraltalk2
+  - karpathy/ng-video-lecture
+  - karpathy/nipspreview
+  - karpathy/nn-zero-to-hero
+  - karpathy/notpygamejs
+  - karpathy/paper-notes
+  - karpathy/pytorch-normalizing-flows
+  - karpathy/randomfun
+  - karpathy/reader3
+  - karpathy/recurrentjs
+  - karpathy/reinforcejs
+  - karpathy/rendergit
+  - karpathy/researchlei
+  - karpathy/researchpooler
+  - karpathy/rustbpe
+  - karpathy/scholaroctopus
+  - karpathy/svmjs
+  - karpathy/tf-agent
+  - karpathy/tsnejs
+  - karpathy/twoolpy
+  - karpathy/ulogme
+last_updated: 2026-04-08
 ---
+The developer demonstrates a strong preference for well-established software design patterns while maintaining pragmatic simplicity. Their approach consistently favors clarity and maintainability over architectural complexity.
 
-# Patterns & Architecture
+## Core Architectural Patterns
 
-## Rewrite-from-Scratch Over Abstraction
+The developer extensively implements **repository patterns** for data access, particularly evident in their Go work where they encapsulate database operations within App structs containing DB references and methods [a8101e25, 38406bcc]. This separation of concerns extends to web applications where they implement **MVC-like architectures** with clear boundaries between Flask routes (controllers), Jinja2 templates (views), and database access functions (models) [759f7e73, 33b2b018].
 
-The dominant architectural pattern is reimplementation. Rather than wrapping existing libraries, Karpathy rewrites core algorithms from first principles: autograd in micrograd, BPE tokenization in minbpe, GPT-2 training in both Python (nanoGPT) and C (llm.c). The implementations are intentionally minimal — they reproduce the essential algorithm without the engineering overhead of production systems. [a1c4e7f](https://github.com/karpathy/micrograd/commit/a1c4e7f)
+For performance-critical features, the developer consistently employs **materialized view patterns**, particularly for trending posts functionality with background goroutines handling periodic rebuilds [9a458854, eed8b1b9]. This pattern appears across multiple projects, demonstrating a systematic approach to optimization.
 
-From a nanoGPT commit message: "the goal is not to compete with Hugging Face but to make GPT training understandable." Each rewrite strips away exactly the layers that obscure the algorithm: Hugging Face's GPT-2 has generation strategies, model parallelism, and cache management; nanoGPT has the forward pass, the loss, and the backward pass. [d4b8f2a](https://github.com/karpathy/nanoGPT/commit/d4b8f2a)
+## Data Processing Pipelines
 
-## Dataclass Configuration
+The developer favors **pipeline architectures** with distinct, independently executable stages. This is evident in their LLM council system implementing a clear 3-stage pipeline (collection → ranking → synthesis) [eb0eb26f, 87b4a178] and their data processing workflows following patterns like scrape → process → score → visualize [0fbf597b, 7fa0be64]. They consistently implement **caching patterns** using JSON or pickle files for intermediate results [e9345a4b, 739f1013], optimizing performance while maintaining debuggability.
 
-Configuration is handled through Python dataclasses with sensible defaults. Every parameter has a default value, so the simplest possible invocation requires zero configuration. Overrides come from command-line arguments parsed into the dataclass, not from YAML/JSON config files. [b3e1a7d](https://github.com/karpathy/nanoGPT/commit/b3e1a7d)
+## Object-Oriented Patterns
 
-```python
-# from nanoGPT configurator.py — override dataclass fields from command line
-for key in globals():
-    if key in config_keys:
-        exec(f"{key} = {globals()[key]}")
-```
+The developer demonstrates sophisticated use of OOP patterns, particularly in [[python]] where they implement:
+- **Factory patterns** with `from_pretrained()` classmethods for model initialization [803f3880, acaadacd]
+- **Abstract base classes** with concrete implementations, especially for neural network generators (LSTMGenerator, RNNGenerator) [2c99eac2, f399811c]
+- **Extensive operator overloading** for mathematical operations (`__add__`, `__mul__`, `__pow__`) [315a2cb3, 5bb63920]
+- **Configuration-driven design** using dataclasses for structured config objects [6e6a5281, ebc28b95]
 
-There are no config files, no environment variable parsing, no config inheritance chains. The dataclass _is_ the documentation of available options. See [[dependencies]] for why external config libraries are avoided.
+## JavaScript Module Patterns
 
-## Linear Training Loops
+In [[javascript]], the developer consistently uses **IIFE (Immediately Invoked Function Expression)** patterns for namespace management and module encapsulation [6d6a4754, 88ae38ee, 46b290ea]. They prefer **prototype-based object construction** over ES6 classes [08d2030d, 53bf4862], and implement **game loop patterns** with init/update/draw lifecycle methods for interactive applications [1d8c733d, f3d83d85].
 
-Training loops are flat, imperative `for` loops with no callback system, no trainer abstraction, no hooks. Everything happens in order: forward pass, loss computation, backward pass, optimizer step, logging. The entire training procedure is visible in 30 lines. [f7e2b9c](https://github.com/karpathy/nanoGPT/commit/f7e2b9c)
+## Error Handling and Defensive Programming
 
-```python
-# from makemore — the same flat loop pattern at a smaller scale
-for i in range(max_steps):
-    # minibatch construct
-    ix = torch.randint(0, Xtr.shape[0], (batch_size,))
-    Xb, Yb = Xtr[ix], Ytr[ix]
+The developer implements robust **defensive programming patterns** including:
+- Platform-specific checks with graceful fallbacks for hardware features [eba36e84, 0d8fbd11]
+- Automatic fallback mechanisms for resource allocation (e.g., falling back to managed memory when device allocation fails) [e6856bc5, 8c586f91]
+- Atomic file operations using temporary files to prevent race conditions [8ce4543c]
 
-    # forward pass
-    logits = model(Xb)
-    loss = F.cross_entropy(logits, Yb)
+## Data Serialization
 
-    # backward pass
-    optimizer.zero_grad(set_to_none=True)
-    loss.backward()
-    optimizer.step()
+A consistent pattern emerges in their approach to **binary file formats**, implementing versioned headers with magic numbers and metadata [4c84bc74, 9740a652, 16635d41]. This pattern appears across [[c]], [[cplusplus]], and [[python]] implementations, showing language-agnostic design thinking.
 
-    # track stats
-    if i % 10000 == 0:
-        print(f'{i:7d}/{max_steps:7d}: {loss.item():.4f}')
-```
+## Web Development Patterns
 
-No `Trainer.fit()`. No `on_epoch_end` callbacks. The training loop reads like pseudocode from a textbook. This pattern holds from the simplest model in makemore to the full GPT-2 training in nanoGPT — the loop just acquires gradient accumulation and learning rate scheduling, never abstraction layers.
+For web applications, the developer implements:
+- **Cursor-based pagination** consistently across endpoints with appropriate cursor types (ID vs rank) [88750810, 9a458854]
+- **CSS custom properties** for theming with dark mode support using `prefers-color-scheme` [ca230d95, ce5c0c0a]
+- **Progressive enhancement** by checking element existence before rendering React components [759f7e73]
+- **Feature flags** through URL parameters rather than configuration files [48a7e01a, 33b2b018]
 
-## Operator Overloading for DSLs
+## Educational and Research Patterns
 
-In micrograd, Python's operator overloading creates a miniature autograd DSL. The `Value` class overloads `+`, `*`, `**`, `tanh`, etc., building a computation graph implicitly. This makes the neural network code look like pure math: [c7a2d1b](https://github.com/karpathy/micrograd/commit/c7a2d1b)
+The developer follows distinct patterns for educational content:
+- **Incremental complexity** building from simple concepts to advanced implementations (bigrams → MLP → backprop → CNN → GPT) [56eda75e, 4c355970]
+- **Documentation by example** through demo scripts (demo1.py, demo2.py, demo3.py) [c7940cf8]
+- **Research reproduction** with explicit tracking of computational complexity and careful documentation of deviations [51c54e0f, 1ee2ac98]
 
-```python
-# from micrograd — a full neural network layer in math notation
-class Neuron:
-    def __call__(self, x):
-        act = sum((wi*xi for wi, xi in zip(self.w, x)), self.b)
-        return act.relu()
-```
-
-The operator overloading is invisible to the reader of the neural network code — `wi*xi` looks like scalar multiplication, but each operation is silently recording the computation graph for backpropagation.
-
-## Progressive Complexity
-
-Repositories build from simple to complex. `makemore` starts with bigram models, progresses through MLPs, to RNNs, to transformers — each in its own notebook or script. Each version is self-contained and does not import from previous versions. The progression teaches concepts incrementally, and the reader can stop at any level and have a complete, working implementation. [e3f8a4b](https://github.com/karpathy/makemore/commit/e3f8a4b)
-
-The same progression plays out across repositories: micrograd (scalar autograd) teaches the foundation for nanoGPT (tensor-level training), which shares the same model architecture reimplemented in llm.c (bare-metal C).
-
-## No Inheritance Hierarchies
-
-Classes do not inherit from each other (beyond `nn.Module` which is framework-required). There are no abstract base classes, no mixins, no template method patterns. Each class is a concrete, standalone implementation. When two classes share logic, it is duplicated rather than extracted into a base class. [b7c1d5e](https://github.com/karpathy/minbpe/commit/b7c1d5e)
-
-minbpe makes this explicit: `BasicTokenizer` and `RegexTokenizer` both inherit from `Tokenizer` (a thin base), but the base class contains only shared utility methods — `save`, `load`, `encode`. Each subclass defines its own complete `train` and `merge` implementation. The base class is a code-sharing convenience, not an abstraction boundary.
-
-## The Same Algorithm, Two Languages
-
-A pattern unique to this body of work: reimplementing the same model in a second language to strip away one more layer of abstraction. nanoGPT trains GPT-2 in PyTorch; `llm.c` trains the same model in raw C. The architectures are deliberately parallel — same struct layout, same function decomposition, same shape comments — so the reader can compare them side by side and see exactly what PyTorch provides versus what you must build yourself. [e8c3f1a](https://github.com/karpathy/llm.c/commit/e8c3f1a)
-
-This cross-language reimplementation is the architectural equivalent of showing your work in math class. The Python version says "this is how transformers work." The C version says "this is what `torch.nn.Linear` actually does under the hood."
+Their preference for **simplicity over complexity** is evident throughout, often implementing custom solutions rather than relying on heavy frameworks [e569b59f, 1076f970]. This pragmatic approach extends to using simple file-based persistence over complex database solutions when appropriate [8ce4543c, c6d566a6].

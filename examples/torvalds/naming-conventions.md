@@ -1,88 +1,49 @@
 ---
-title: "Naming Conventions"
-category: style
-confidence: high
-sources: [torvalds/linux]
-related: [code-structure, comments-and-docs, languages/c]
-last_updated: 2026-04-07
+title: Naming Conventions
+category: dimension
+confidence: 0.95
+source_repos:
+  - torvalds/1590A
+  - torvalds/AudioNoise
+  - torvalds/GuitarPedal
+  - torvalds/HunspellColorize
+  - torvalds/linux
+  - torvalds/pesconvert
+  - torvalds/test-tlb
+  - torvalds/uemacs
+last_updated: 2026-04-08
 ---
+The developer demonstrates highly consistent naming conventions across multiple languages, with a strong preference for snake_case and clear, descriptive names that indicate purpose and subsystem origin.
 
-# Naming Conventions
+## Core Patterns
 
-## snake_case Everything
+The developer follows traditional C naming conventions with remarkable consistency:
+- **Functions and variables**: Always lowercase with underscores (snake_case) [6a6daef2, f434a0e2, 1c3e8c3b, 316f2559]
+- **Constants and macros**: Always uppercase with underscores [1c1b25ef, 1cdcf9df, 3036cd0d, 86782c16]
+- **Struct names**: Used without typedef, following Linux kernel style [6a6daef2, f434a0e2]
 
-All identifiers use `snake_case` without exception. CamelCase is explicitly rejected in code review — the kernel coding style document reflects this, and Torvalds enforces it aggressively in merge reviews. [b3a7f1d](https://github.com/torvalds/linux/commit/b3a7f1d)
+## Language-Specific Conventions
 
-```c
-/* Correct */
-struct task_struct *find_task_by_pid(pid_t pid);
-int nr_running;
-void schedule_timeout(long timeout);
+### C and System Programming
+The developer strictly adheres to Linux kernel naming conventions [3036cd0d, 86782c16, 66d64899]. Functions use descriptive names with subsystem prefixes (e.g., `bnxt_`, `mlx5_`, `ice_`, `mshv_`, `enetc_`) [86782c16, bfe62a45, f8f5627a, abacaf55]. Hardware register definitions and bit masks consistently use uppercase with underscores (e.g., `MAC_TCR_SS_INDEX`, `ENETC4_POR`) [abacaf55, f8f5627a, 453a4a5f].
 
-/* Rejected in review */
-struct TaskStruct *FindTaskByPid(pid_t pid);  /* never */
-```
+### Python
+The developer follows PEP 8 conventions consistently, using snake_case for all identifiers [4e524250, a63ddd7a, 15bd3c10]. This alignment with [[python]] idioms shows attention to language-specific standards.
 
-## Short Locals, Descriptive Globals
+### Build Systems and Configuration
+In [[cmake]] files, the developer uses CamelCase for board/project names while maintaining snake_case for source files [0a363123, d999fef1, c9098c2c]. Tag naming for releases follows a consistent format: `v7.0-rc[N]` for versions and `subsystem-YYYY-MM-DD` for dated releases [abacaf55, f8f5627a, 453a4a5f].
 
-Local variables are kept short — single letters for loop counters, brief abbreviations for function-scoped temporaries. Global and file-scope symbols get descriptive names because they need to be greppable across millions of lines. [d8e2c4a](https://github.com/torvalds/linux/commit/d8e2c4a)
+## Descriptive Naming Philosophy
 
-```c
-/* Typical local naming */
-int i, ret;
-struct page *p;
-unsigned long flags;
+The developer prioritizes clarity over brevity. Function names clearly indicate their purpose:
+- Domain-specific: `flanger_step`, `biquad_notch_filter` [c9098c2c, 2f3c1c07]
+- Action-oriented: `parse_pes_stitches`, `output_cairo`, `randomize_map` [7a7221a3, cea02218]
+- Module-prefixed: `phaser_init`, `biquad_step` matching their module names [1c3e8c3b, 316f2559]
 
-/* Typical global naming */
-unsigned long total_forks;
-struct rw_semaphore namespace_sem;
-```
+This naming approach aligns with the developer's [[code-structure]] practices, where clear module boundaries are reflected in naming prefixes.
 
-The variable `ret` deserves special mention: it is the universal name for a function's return value, used in virtually every non-trivial kernel function. Seeing `ret` in kernel code immediately communicates "this is the error code that will be returned."
+## Cross-Language Consistency
 
-## Subsystem-Prefixed Functions
+Remarkably, the developer maintains consistent conventions across diverse languages including [[c]], [[assembly]], [[shell]], and [[python]]. Even in domain-specific languages like [[openscad]], the developer uses descriptive, function-based naming (e.g., `DaisySeed`, `Buffered`, `Plain` for boards) [e3660495, eb0d867a].
 
-Public functions are prefixed with their subsystem name to create a namespace in C's flat symbol space. The prefix acts as a module boundary indicator — see [[code-structure]] for how this maps to directory layout.
-
-```c
-/* VFS subsystem */
-int vfs_open(const struct path *path, struct file *file);
-int vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos);
-
-/* Memory management */
-struct page *alloc_pages(gfp_t gfp_mask, unsigned int order);
-void __free_pages(struct page *page, unsigned int order);
-
-/* Networking */
-int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len);
-void tcp_send_ack(struct sock *sk);
-```
-
-The double-underscore prefix (`__free_pages`) denotes an internal variant that skips some validation — a convention used consistently across subsystems. This creates a two-level API: the public function validates inputs and calls the `__` variant for the actual work. [a5f9b2e](https://github.com/torvalds/linux/commit/a5f9b2e)
-
-## Struct Naming
-
-Structs are named descriptively and never typedef'd (see [[type-discipline]]). The `struct` keyword is always spelled out. Struct member names are kept short since they're always qualified by the struct variable:
-
-```c
-struct vm_area_struct {
-    unsigned long vm_start;
-    unsigned long vm_end;
-    struct mm_struct *vm_mm;
-    pgprot_t vm_page_prot;
-};
-```
-
-The `vm_` prefix on members mirrors the struct's role — this per-subsystem member prefix is a consistent kernel convention. It prevents name collisions when macros or generic code operates on member names, and it makes grepping for all uses of a particular field reliable.
-
-## Macro Naming
-
-Macros use `UPPER_SNAKE_CASE`. Function-like macros that evaluate arguments multiple times are generally avoided in favor of `static inline` functions, but when macros are necessary, the naming makes their macro nature visible. See [[languages/c]] for macro idiom details. [e1c7d3f](https://github.com/torvalds/linux/commit/e1c7d3f)
-
-## Abbreviation Conventions
-
-The kernel has a stable vocabulary of abbreviations used across all subsystems: `nr` (number), `prev`/`next`, `src`/`dst`, `len`, `buf`, `ctx` (context), `ops` (operations), `cb` (callback), `priv` (private data), `desc` (descriptor). These are used consistently enough that they function as domain-specific shorthand — a new kernel developer learns them once and reads them everywhere.
-
-## Error Constants
-
-Error returns use the standard negative `errno` values (`-ENOMEM`, `-EINVAL`, `-ENOSPC`). Functions that can fail return `int` with zero for success and a negative errno on failure. Pointer-returning functions use `ERR_PTR()` / `IS_ERR()` / `PTR_ERR()` to encode errors in the pointer value, avoiding the need for a separate output parameter. This convention is so pervasive that violating it — returning `NULL` where `ERR_PTR(-ENOMEM)` is expected — is a common source of bugs caught in review. [c4d8f2a](https://github.com/torvalds/linux/commit/c4d8f2a)
+The consistency extends to [[commit-hygiene]], where subsystem prefixes in commit messages (e.g., 'MPTCP:', 'NFC:', 'DRM DRIVERS') follow uppercase conventions [a1d9d8e8, 1c9982b4, abacaf55].

@@ -1,46 +1,62 @@
 ---
-title: "Data Sources"
+title: Sources
 category: meta
-last_updated: 2026-04-07
+last_updated: 2026-04-08
 ---
 
-# Data Sources
+# Sources
 
 ## Repositories Analyzed
 
-| Repository | Commits Fetched | Commits Sampled | Primary Language |
-|------------|----------------|-----------------|------------------|
-| karpathy/nanoGPT | 95 | 82 | Python |
-| karpathy/llm.c | 142 | 120 | C |
-| karpathy/micrograd | 34 | 34 | Python |
-| karpathy/minbpe | 41 | 38 | Python |
-| karpathy/makemore | 47 | 42 | Python |
-
-## Sampling Notes
-
-- **nanoGPT**: Most active Python repository. Training loop and model definition provide the strongest signal for Python style conventions
-- **llm.c**: Primary source for C idioms. Very active with 500+ commits; sampled recent 142 focused on the core `train_gpt2.c` implementation
-- **micrograd**: Small but high-signal — every commit is authored by Karpathy with clear style intent
-- **minbpe**: Clean BPE tokenizer implementation. Good signal for class hierarchy decisions and testing patterns
-- **makemore**: Progression of language models (bigram → MLP → RNN → transformer). Shows how code structure scales
-
-## Excluded Repositories
-
-- **nn-zero-to-hero**: Course materials (notebooks), not standalone code
-- **build-nanogpt**: YouTube walkthrough code, closely mirrors nanoGPT
-- **char-rnn**: Legacy Lua code, not representative of current style
-
-## Coverage Gaps
-
-- **Private repositories**: None known; Karpathy works entirely in public
-- **Collaborative work**: Tesla/OpenAI work is not on personal GitHub — only solo educational projects are analyzed
-- **Notebooks**: Jupyter notebooks in nn-zero-to-hero were excluded; style may differ in notebook-first workflows
-
-## Confidence Impact
-
-Articles grounded in nanoGPT + llm.c (e.g., [[code-structure]], [[naming-conventions]], [[dependencies]]) have the highest confidence. Articles extrapolating from smaller repos (e.g., [[testing]]) have medium confidence.
-
-**Total commits fetched:** 359
-**Total commits sampled:** 316
-**Unique files touched:** 187
-**Date range:** 2022-11 to 2026-03
+- [karpathy/EigenLibSVM](https://github.com/karpathy/EigenLibSVM)
+- [karpathy/KarpathyTalk](https://github.com/karpathy/KarpathyTalk)
+- [karpathy/LLM101n](https://github.com/karpathy/LLM101n)
+- [karpathy/Random-Forest-Matlab](https://github.com/karpathy/Random-Forest-Matlab)
+- [karpathy/arxiv-sanity-lite](https://github.com/karpathy/arxiv-sanity-lite)
+- [karpathy/arxiv-sanity-preserver](https://github.com/karpathy/arxiv-sanity-preserver)
+- [karpathy/autoresearch](https://github.com/karpathy/autoresearch)
+- [karpathy/build-nanogpt](https://github.com/karpathy/build-nanogpt)
+- [karpathy/calorie](https://github.com/karpathy/calorie)
+- [karpathy/char-rnn](https://github.com/karpathy/char-rnn)
+- [karpathy/convnetjs](https://github.com/karpathy/convnetjs)
+- [karpathy/covid-sanity](https://github.com/karpathy/covid-sanity)
+- [karpathy/cryptos](https://github.com/karpathy/cryptos)
+- [karpathy/deep-vector-quantization](https://github.com/karpathy/deep-vector-quantization)
+- [karpathy/find-birds](https://github.com/karpathy/find-birds)
+- [karpathy/forestjs](https://github.com/karpathy/forestjs)
+- [karpathy/hn-time-capsule](https://github.com/karpathy/hn-time-capsule)
+- [karpathy/jobs](https://github.com/karpathy/jobs)
+- [karpathy/karpathy](https://github.com/karpathy/karpathy)
+- [karpathy/karpathy.github.io](https://github.com/karpathy/karpathy.github.io)
+- [karpathy/lecun1989-repro](https://github.com/karpathy/lecun1989-repro)
+- [karpathy/llama2.c](https://github.com/karpathy/llama2.c)
+- [karpathy/llm-council](https://github.com/karpathy/llm-council)
+- [karpathy/llm.c](https://github.com/karpathy/llm.c)
+- [karpathy/makemore](https://github.com/karpathy/makemore)
+- [karpathy/micrograd](https://github.com/karpathy/micrograd)
+- [karpathy/minGPT](https://github.com/karpathy/minGPT)
+- [karpathy/minbpe](https://github.com/karpathy/minbpe)
+- [karpathy/nanoGPT](https://github.com/karpathy/nanoGPT)
+- [karpathy/nanochat](https://github.com/karpathy/nanochat)
+- [karpathy/neuraltalk](https://github.com/karpathy/neuraltalk)
+- [karpathy/neuraltalk2](https://github.com/karpathy/neuraltalk2)
+- [karpathy/ng-video-lecture](https://github.com/karpathy/ng-video-lecture)
+- [karpathy/nipspreview](https://github.com/karpathy/nipspreview)
+- [karpathy/nn-zero-to-hero](https://github.com/karpathy/nn-zero-to-hero)
+- [karpathy/notpygamejs](https://github.com/karpathy/notpygamejs)
+- [karpathy/paper-notes](https://github.com/karpathy/paper-notes)
+- [karpathy/pytorch-normalizing-flows](https://github.com/karpathy/pytorch-normalizing-flows)
+- [karpathy/randomfun](https://github.com/karpathy/randomfun)
+- [karpathy/reader3](https://github.com/karpathy/reader3)
+- [karpathy/recurrentjs](https://github.com/karpathy/recurrentjs)
+- [karpathy/reinforcejs](https://github.com/karpathy/reinforcejs)
+- [karpathy/rendergit](https://github.com/karpathy/rendergit)
+- [karpathy/researchlei](https://github.com/karpathy/researchlei)
+- [karpathy/researchpooler](https://github.com/karpathy/researchpooler)
+- [karpathy/rustbpe](https://github.com/karpathy/rustbpe)
+- [karpathy/scholaroctopus](https://github.com/karpathy/scholaroctopus)
+- [karpathy/svmjs](https://github.com/karpathy/svmjs)
+- [karpathy/tf-agent](https://github.com/karpathy/tf-agent)
+- [karpathy/tsnejs](https://github.com/karpathy/tsnejs)
+- [karpathy/twoolpy](https://github.com/karpathy/twoolpy)
+- [karpathy/ulogme](https://github.com/karpathy/ulogme)

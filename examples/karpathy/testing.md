@@ -1,82 +1,111 @@
 ---
-title: "Testing"
-category: style
-confidence: medium
-sources: [karpathy/nanoGPT, karpathy/micrograd, karpathy/llm.c, karpathy/minbpe]
-related: [patterns, commit-hygiene, comments-and-docs]
-last_updated: 2026-04-07
+title: Testing
+category: dimension
+confidence: 0.85
+source_repos:
+  - karpathy/EigenLibSVM
+  - karpathy/KarpathyTalk
+  - karpathy/LLM101n
+  - karpathy/Random-Forest-Matlab
+  - karpathy/arxiv-sanity-lite
+  - karpathy/arxiv-sanity-preserver
+  - karpathy/autoresearch
+  - karpathy/build-nanogpt
+  - karpathy/calorie
+  - karpathy/char-rnn
+  - karpathy/convnetjs
+  - karpathy/covid-sanity
+  - karpathy/cryptos
+  - karpathy/deep-vector-quantization
+  - karpathy/find-birds
+  - karpathy/forestjs
+  - karpathy/hn-time-capsule
+  - karpathy/jobs
+  - karpathy/karpathy
+  - karpathy/karpathy.github.io
+  - karpathy/lecun1989-repro
+  - karpathy/llama2.c
+  - karpathy/llm-council
+  - karpathy/llm.c
+  - karpathy/makemore
+  - karpathy/micrograd
+  - karpathy/minGPT
+  - karpathy/minbpe
+  - karpathy/nanoGPT
+  - karpathy/nanochat
+  - karpathy/neuraltalk
+  - karpathy/neuraltalk2
+  - karpathy/ng-video-lecture
+  - karpathy/nipspreview
+  - karpathy/nn-zero-to-hero
+  - karpathy/notpygamejs
+  - karpathy/paper-notes
+  - karpathy/pytorch-normalizing-flows
+  - karpathy/randomfun
+  - karpathy/reader3
+  - karpathy/recurrentjs
+  - karpathy/reinforcejs
+  - karpathy/rendergit
+  - karpathy/researchlei
+  - karpathy/researchpooler
+  - karpathy/rustbpe
+  - karpathy/scholaroctopus
+  - karpathy/svmjs
+  - karpathy/tf-agent
+  - karpathy/tsnejs
+  - karpathy/twoolpy
+  - karpathy/ulogme
+last_updated: 2026-04-08
 ---
+The developer exhibits highly varied testing practices across different projects and languages, ranging from comprehensive test suites to complete absence of automated testing.
 
-# Testing
+## Language-Specific Patterns
 
-## The Pedagogical Testing Philosophy
+### Go: Comprehensive Table-Driven Testing
 
-None of the analyzed repositories use pytest, unittest, or any testing framework. There are no `test_*.py` files following standard conventions (with one exception noted below). This reflects a deliberate stance about what "correctness" means for educational code. [d4b8f2a](https://github.com/karpathy/nanoGPT/commit/d4b8f2a)
+In [[go]] projects, the developer demonstrates sophisticated testing practices. They consistently write comprehensive table-driven tests with helper functions for test setup [38406bcc, eed8b1b9, 9a458854]. Test helpers like `newTestApp()` and `markdownHTML()` reduce boilerplate and improve readability [38406bcc, eed8b1b9, 9a458854, 0a89c58f, a8101e25]. Tests cover both happy paths and edge cases, including security scenarios like self-engagement gaming [eed8b1b9, 49a682e6, 38406bcc]. The developer focuses on behavior and integration testing rather than isolated unit tests [38406bcc, eed8b1b9, 0a89c58f].
 
-The implicit contract is: the reader _is_ the test suite. When someone clones nanoGPT and runs `python train.py`, they are simultaneously learning the material and verifying the implementation. If the loss converges and the generated text looks reasonable, the code is correct. If it does not, the reader has a debugging exercise that teaches them more than any passing test would.
+### Python: Mixed Approaches
 
-This inverts the standard relationship between tests and users. In production code, tests protect users from regressions. In educational code, the user's act of running and understanding the code _is_ the verification.
+In [[python]] projects, the developer's testing approach varies significantly:
 
-The approach also reflects the nature of the audience. Someone working through micrograd or nanoGPT is learning backpropagation or transformer training — they benefit from understanding _why_ something went wrong, not from seeing a red/green test result. A failing training run is a more valuable learning experience than a failing test case.
+- **With pytest**: When using established frameworks, they create comprehensive test suites with parameterized tests [d278867d, 45cb371b, e82c123c, 37b63c28]
+- **PyTorch validation**: Adds comprehensive unit tests comparing against PyTorch for correctness validation [315a2cb3, 5973e7b3, 315dda3d]
+- **Runtime validation**: Often includes runtime validation and fast-fail checks rather than formal tests [c2450add, 0be1e4fd]
+- **No testing**: Many Python projects lack any test files or testing infrastructure [eb0eb26f, 827bfd3d, 87b4a178, 8affe1d7, 92e1fccb]
 
-## Validation Scripts
+### Low-Level Languages: Gradient Testing
 
-Where automated verification does exist, it takes the form of standalone scripts that run the implementation end-to-end and print results for human inspection. `llm.c` has `test_gpt2.c` which loads a checkpoint, runs a forward pass, and prints loss values that should match the Python reference: [e8c3f1a](https://github.com/karpathy/llm.c/commit/e8c3f1a)
+For [[c]], [[cplusplus]], and [[cuda]] projects, the developer maintains dedicated test files (e.g., `test_gpt2.cu`) with gradient checking and validation against expected outputs [f1e2ace6, e33402f7]. This shows commitment to numerical correctness verification in performance-critical code.
 
-```c
-// in test_gpt2.c — the "test" is a human comparing two numbers
-// expected loss at step 0: 5.2700
-// expected loss at step 10: 4.0600
-// if your loss is very different, something is wrong
-```
+### JavaScript: Demo-Based Testing
 
-The "test" is comparing printed output against known-good values documented in comments. This is manual regression testing — but it teaches the reader what the expected behavior looks like, which an automated test would hide behind a green checkmark.
+In [[javascript]] projects, the developer rarely uses formal testing frameworks. One exception shows Jasmine framework adoption with gradient checking tests [f1addd3a]. More commonly, they rely on:
+- Interactive web demos for validation [80e61f4c, 0b9315a6, 32706e14, 08af2a2f]
+- Demo HTML files for manual testing [3e62bba1, 32ea5fc6, 3ba9014c]
+- Simple assertion-based tests in Node.js [f480d05e]
 
-## Reference Implementation Comparison
+## Testing Philosophy
 
-The primary testing strategy across projects is cross-validation against a reference. `llm.c` validates against PyTorch outputs. `minbpe` validates against OpenAI's tiktoken. `micrograd` validates against PyTorch autograd. The pattern: implement from scratch, then verify outputs match the established library to within floating-point tolerance. [c7a2d1b](https://github.com/karpathy/micrograd/commit/c7a2d1b)
+The developer appears to follow a "vibe coding" approach in many projects [64960f99], prioritizing rapid prototyping over test-driven development. They often rely on:
 
-```python
-# from micrograd test — verify gradient correctness against PyTorch
-x = Value(-4.0)
-z = 2*x + 2 + x
-# ... operations ...
-xpt = torch.Tensor([-4.0]).double()
-# ... same operations with PyTorch ...
-assert abs(x.grad - xpt.grad.item()) < 1e-6
-```
+- **Manual testing**: Through demo scripts, dry-run flags, and debugging options [48a7e01a, 23b0e109]
+- **Evaluation scripts**: Rather than unit tests, especially in ML projects [2c99eac2, 83366151, 63607a7e]
+- **Interactive notebooks**: For validation in [[jupyter-notebook]] projects [ae0363ad, 36b2ad47, 333e0441]
+- **Production monitoring**: Bug fixes appear reactive to user reports rather than proactive testing [2d62a1c4, 13ece5d7]
 
-micrograd is the one exception that does have a `test/` directory with proper assertions. The reason is telling: gradient correctness requires numerical verification because a wrong gradient produces silently wrong training, not an obvious crash. The test exists precisely where visual inspection fails.
+## Cross-Language Patterns
 
-Similarly, minbpe validates its output against tiktoken byte by byte — because a tokenizer that silently encodes one wrong token will produce garbled model behavior that would be nearly impossible to diagnose downstream.
+The developer shows interesting cross-language testing patterns:
+- Writes Python-based integration tests for [[rust]] code, including property-based testing and benchmarks [1eb8e821, 7772a98a]
+- Maintains test coverage when making architectural changes [1076f970]
+- Documents performance impacts in [[commit-hygiene]] through experimental validation [6ed7d1d8, 4b407742, 4e1694cc]
 
-## Training Loss as Test Signal
+## Notable Exceptions
 
-For neural network code, the primary correctness indicator is training loss convergence. If loss goes down, the implementation is likely correct. README files document expected loss curves: "after 5000 iterations you should see a loss of ~1.48." This turns every training run into an integration test. [f7e2b9c](https://github.com/karpathy/nanoGPT/commit/f7e2b9c)
+Some projects stand out for their testing approach:
+- Bitcoin-related Python code includes comprehensive unit tests mirroring main code structure [7cf9c084, a3906161, 48a07a07]
+- [[lua]] projects include test functions and cross-validation utilities [73e1715f, 7513852b]
+- [[matlab]] projects use demo scripts for functionality testing [f7903a1e, d07d3fb5, 0e6fb20c]
 
-This is more powerful than it first appears. A converging loss exercises the full pipeline — data loading, forward pass, loss computation, gradient computation, optimizer step. A bug in any of these stages almost always manifests as diverging or stuck loss.
-
-## Print-Based Debugging
-
-`print()` statements are the debugging tool. Training scripts print loss, learning rate, and throughput metrics every N steps. Sample generation is interleaved with training to provide qualitative output inspection: [a7f3b8c](https://github.com/karpathy/nanoGPT/commit/a7f3b8c)
-
-```python
-if iter_num % eval_interval == 0:
-    losses = estimate_loss()
-    print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-if iter_num % sample_interval == 0:
-    context = torch.zeros((1, 1), dtype=torch.long, device=device)
-    print(decode(model.generate(context, max_new_tokens=200)[0].tolist()))
-```
-
-There is no logging framework, no structured log output, no log levels. The output is designed for a human watching the terminal — the qualitative text samples let you _see_ the model learning in real time, which serves both as debugging and as pedagogy.
-
-## The Spectrum Across Repos
-
-The testing philosophy is not uniform — it calibrates to the stakes. micrograd, where a gradient bug is silent and catastrophic, has the most formal testing. nanoGPT, where bugs manifest as bad loss curves, relies on training convergence. `llm.c`, where the C implementation must match the Python reference exactly, uses cross-implementation comparison. minbpe validates against tiktoken's output. Each project tests at the level where bugs would otherwise be invisible.
-
-This reveals a principled rule: write formal tests only where the failure mode is silent. If a bug produces an obvious symptom (diverging loss, garbled text, compilation error), the educational context provides its own feedback loop.
-
-## What This Rules Out
-
-The absence of formal tests has a specific consequence: there is no CI, no pre-commit hooks, no automated gate between writing code and pushing it. This is viable because the projects are single-author and the audience is learners, not dependents. See [[commit-hygiene]] for how the direct-to-main workflow connects to this.
+The developer's testing practices strongly correlate with project maturity and language ecosystem, showing adaptability but also a general preference for manual validation over automated testing in experimental or prototype code.

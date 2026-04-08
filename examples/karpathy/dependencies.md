@@ -1,64 +1,88 @@
 ---
-title: "Dependencies"
-category: style
-confidence: high
-sources: [karpathy/nanoGPT, karpathy/micrograd, karpathy/llm.c, karpathy/minbpe, karpathy/makemore]
-related: [code-structure, patterns]
-last_updated: 2026-04-07
+title: Dependencies
+category: dimension
+confidence: 0.9
+source_repos:
+  - karpathy/EigenLibSVM
+  - karpathy/KarpathyTalk
+  - karpathy/LLM101n
+  - karpathy/Random-Forest-Matlab
+  - karpathy/arxiv-sanity-lite
+  - karpathy/arxiv-sanity-preserver
+  - karpathy/autoresearch
+  - karpathy/build-nanogpt
+  - karpathy/calorie
+  - karpathy/char-rnn
+  - karpathy/convnetjs
+  - karpathy/covid-sanity
+  - karpathy/cryptos
+  - karpathy/deep-vector-quantization
+  - karpathy/find-birds
+  - karpathy/forestjs
+  - karpathy/hn-time-capsule
+  - karpathy/jobs
+  - karpathy/karpathy
+  - karpathy/karpathy.github.io
+  - karpathy/lecun1989-repro
+  - karpathy/llama2.c
+  - karpathy/llm-council
+  - karpathy/llm.c
+  - karpathy/makemore
+  - karpathy/micrograd
+  - karpathy/minGPT
+  - karpathy/minbpe
+  - karpathy/nanoGPT
+  - karpathy/nanochat
+  - karpathy/neuraltalk
+  - karpathy/neuraltalk2
+  - karpathy/ng-video-lecture
+  - karpathy/nipspreview
+  - karpathy/nn-zero-to-hero
+  - karpathy/notpygamejs
+  - karpathy/paper-notes
+  - karpathy/pytorch-normalizing-flows
+  - karpathy/randomfun
+  - karpathy/reader3
+  - karpathy/recurrentjs
+  - karpathy/reinforcejs
+  - karpathy/rendergit
+  - karpathy/researchlei
+  - karpathy/researchpooler
+  - karpathy/rustbpe
+  - karpathy/scholaroctopus
+  - karpathy/svmjs
+  - karpathy/tf-agent
+  - karpathy/tsnejs
+  - karpathy/twoolpy
+  - karpathy/ulogme
+last_updated: 2026-04-08
 ---
+The developer demonstrates a strong minimalist philosophy toward dependencies, consistently preferring to implement functionality from scratch rather than relying on external libraries. This pattern is most evident in their explicit comments about removing dependencies for security and simplicity [a445144d, 03be9536, e569b59f].
 
-# Dependencies
+## Core Philosophy
 
-## Minimal Dependency Philosophy
+The developer actively works to minimize external dependencies, often implementing complex functionality from scratch. In JavaScript projects, they achieve zero runtime dependencies, creating self-contained libraries [6d6a4754, 88ae38ee, f480d05e]. In Python projects, they frequently rely only on the standard library, implementing cryptographic primitives [948711d1, db4e27d9] and neural networks [f1addd3a] from scratch rather than using established libraries.
 
-The defining dependency pattern is radical minimalism. `micrograd` has zero dependencies — no numpy, no PyTorch, just Python's `math` module. `minbpe` depends only on `regex`. `nanoGPT` depends on `torch`, `numpy`, `tiktoken`, and `datasets` — the absolute minimum for training a transformer. [a1c4e7f](https://github.com/karpathy/micrograd/commit/a1c4e7f)
+## Language-Specific Patterns
 
-There are no utility libraries (no `tqdm`, no `rich`, no `click`), no configuration frameworks (no `hydra`, no `omegaconf`), no experiment tracking (no `wandb`, no `mlflow`). Every dependency that exists is load-bearing — it does something that would take hundreds of lines to reimplement.
+### Python
+In [[python]] projects, the developer uses modern dependency management with `pyproject.toml` and `uv.lock` [b11d6f28, 9c383a8c], but keeps dependencies minimal. They typically rely on the scientific Python stack (NumPy, Matplotlib, PyTorch) only when necessary [26675947, 333e0441]. The developer actively removes dependencies when possible, replacing scipy with PyTorch equivalents [cae0006f].
 
-This minimalism serves the pedagogical mission: each dependency the reader does not have to understand is one fewer obstacle between them and the algorithm. A `tqdm` progress bar is convenient, but a `print(f"step {i}")` is transparent.
+### JavaScript
+For [[javascript]] projects, the developer maintains zero runtime dependencies in core libraries [88ae38ee, f480d05e], though they use jQuery and jQuery UI for demo interfaces [72b4719f, 3e62bba1]. They prefer vanilla implementations over frameworks [9f400b91].
 
-## PyTorch as the Only Framework
+### Go
+In [[go]] projects, the developer uses only well-established libraries like goldmark for markdown and modernc.org/sqlite for database functionality [a8101e25], preferring standard library solutions elsewhere.
 
-When a deep learning framework is needed, it is PyTorch. There is no TensorFlow, no JAX, no Flax in any repository. PyTorch is used directly — `torch.nn.Module`, `torch.optim`, `torch.nn.functional` — without wrappers like PyTorch Lightning or Hugging Face Accelerate. [d4b8f2a](https://github.com/karpathy/nanoGPT/commit/d4b8f2a)
+### C/C++/CUDA
+For low-level [[c]], [[cplusplus]], and [[cuda]] code, the developer relies primarily on standard libraries (stdio.h, stdlib.h, math.h) and platform-specific headers only when necessary [d9862069, b233b770]. They use CUDA libraries (cublas, cudnn) for GPU operations [cb445113, 17872103].
 
-```python
-import torch
-import torch.nn as nn
-from torch.nn import functional as F
+## Dependency Management Practices
 
-# that's it. no Lightning, no Accelerate, no deepspeed wrappers.
-```
+The developer provides graceful fallbacks for optional dependencies, particularly for GPU libraries in [[lua]] projects [ef0373f0, 9cb025b1]. They document dependencies clearly in comments with pip install instructions [69cb21f0, a108c323] and maintain requirements.txt files [8d071865].
 
-From a commit message: "complexity should be in understanding the model, not in understanding the framework." This rejects the trend toward training frameworks that manage distributed computing, mixed precision, and checkpointing behind an opaque API. [f7e2b9c](https://github.com/karpathy/nanoGPT/commit/f7e2b9c)
+When dependencies are necessary, the developer chooses performance-focused options like ahash for hashing and rayon for parallelism in [[rust]] [7772a98a], and prefers self-hosting resources over external CDNs for privacy [3c8d9093].
 
-## Zero External Dependencies in C
+## Cross-Platform Considerations
 
-`llm.c` takes the no-dependency philosophy to its extreme. The entire GPT-2 training implementation uses only the C standard library — `stdio.h`, `stdlib.h`, `math.h`, `string.h`. No BLAS, no MKL, no external math library. Matrix multiplications are hand-written loops. [e8c3f1a](https://github.com/karpathy/llm.c/commit/e8c3f1a)
-
-This makes the build command `gcc train_gpt2.c -o train_gpt2 -lm` — no cmake, no pkg-config, no linker flags hunting for library paths. The reader goes from "I cloned this" to "I'm running GPT-2 training" in one compiler invocation. CUDA support was added later as an optional code path, but the CPU reference implementation remains dependency-free.
-
-## No requirements.txt
-
-Most repositories lack `requirements.txt` or `setup.py`. Dependencies are documented in the README: "install PyTorch, then run `python train.py`." The assumption is that users can install 2-3 well-known packages without automated dependency management. [b3e1a7d](https://github.com/karpathy/nanoGPT/commit/b3e1a7d)
-
-When `requirements.txt` does exist (as in nanoGPT), it lists 4-5 packages with no version pins:
-
-```
-torch
-numpy
-transformers
-datasets
-tiktoken
-```
-
-No `torch>=2.0.0,<2.1.0`. No lock files. The expectation is "latest stable works." This is the opposite of production dependency management, where pinning prevents environment drift. For educational code that someone runs once to learn from, the simplicity of unpinned deps outweighs the risk of version conflicts.
-
-## Standard Library First
-
-Python's standard library is preferred over third-party alternatives. File I/O uses `open()`, not `pathlib` (in most cases). Argument parsing uses `argparse` or raw `sys.argv` manipulation, not `click` or `typer`. JSON handling uses `json`, not `orjson`. [c9a4d2e](https://github.com/karpathy/nanoGPT/commit/c9a4d2e)
-
-The exception is `tiktoken` (OpenAI's BPE library) which is used for tokenization in nanoGPT because writing a correct BPE tokenizer is a separate project — which Karpathy later did as `minbpe`. The dependency existed until the pedagogical itch demanded reimplementation.
-
-## The Dependency Gradient
-
-There is a clear gradient across the repositories: micrograd (zero deps) -> minbpe (`regex` only) -> nanoGPT (PyTorch + 4 packages) -> `llm.c` (zero deps, C standard library only). The gradient maps to pedagogical intent. micrograd and `llm.c` are "understand from scratch" projects where every line of computation is visible. nanoGPT accepts PyTorch as a given because the lesson is transformer architecture, not tensor computation. Each project's dependency set reveals what it considers prerequisite knowledge versus what it intends to teach.
+The developer carefully manages platform-specific dependencies with conditional compilation [cb445113, e6856bc5] and separate implementations for different operating systems [de780a83, b6676ecc]. This attention to portability aligns with their minimalist approach, ensuring code can run in various environments with minimal external requirements.

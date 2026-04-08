@@ -1,80 +1,109 @@
 ---
-title: "Comments & Documentation"
-category: style
-confidence: high
-sources: [karpathy/nanoGPT, karpathy/micrograd, karpathy/llm.c, karpathy/minbpe, karpathy/makemore]
-related: [naming-conventions, type-discipline, code-structure]
-last_updated: 2026-04-07
+title: Comments and Documentation
+category: dimension
+confidence: 0.9
+source_repos:
+  - karpathy/EigenLibSVM
+  - karpathy/KarpathyTalk
+  - karpathy/LLM101n
+  - karpathy/Random-Forest-Matlab
+  - karpathy/arxiv-sanity-lite
+  - karpathy/arxiv-sanity-preserver
+  - karpathy/autoresearch
+  - karpathy/build-nanogpt
+  - karpathy/calorie
+  - karpathy/char-rnn
+  - karpathy/convnetjs
+  - karpathy/covid-sanity
+  - karpathy/cryptos
+  - karpathy/deep-vector-quantization
+  - karpathy/find-birds
+  - karpathy/forestjs
+  - karpathy/hn-time-capsule
+  - karpathy/jobs
+  - karpathy/karpathy
+  - karpathy/karpathy.github.io
+  - karpathy/lecun1989-repro
+  - karpathy/llama2.c
+  - karpathy/llm-council
+  - karpathy/llm.c
+  - karpathy/makemore
+  - karpathy/micrograd
+  - karpathy/minGPT
+  - karpathy/minbpe
+  - karpathy/nanoGPT
+  - karpathy/nanochat
+  - karpathy/neuraltalk
+  - karpathy/neuraltalk2
+  - karpathy/ng-video-lecture
+  - karpathy/nipspreview
+  - karpathy/nn-zero-to-hero
+  - karpathy/notpygamejs
+  - karpathy/paper-notes
+  - karpathy/pytorch-normalizing-flows
+  - karpathy/randomfun
+  - karpathy/reader3
+  - karpathy/recurrentjs
+  - karpathy/reinforcejs
+  - karpathy/rendergit
+  - karpathy/researchlei
+  - karpathy/researchpooler
+  - karpathy/rustbpe
+  - karpathy/scholaroctopus
+  - karpathy/svmjs
+  - karpathy/tf-agent
+  - karpathy/tsnejs
+  - karpathy/twoolpy
+  - karpathy/ulogme
+last_updated: 2026-04-08
 ---
+The developer demonstrates a strong commitment to comprehensive documentation across multiple levels, from detailed README files to inline comments and function docstrings. Their documentation style varies significantly based on context and language, showing a pragmatic approach to code clarity.
 
-# Comments & Documentation
+## Documentation Philosophy
 
-## Inline Explanations Over Docstrings
+The developer prioritizes extensive documentation, particularly for educational and research-oriented projects. They frequently include explanatory comments that go beyond describing what code does to explain why decisions were made [e569b59f, 1076f970, 4e1694cc]. This is especially evident in their [[python]] projects where they provide comprehensive docstrings with Args and Returns sections [eb0eb26f, 827bfd3d], and in [[jupyter-notebook]] files where they heavily use markdown cells to provide educational context [ae0363ad, 36b2ad47, 882b9acc].
 
-Functions rarely have docstrings. Instead, critical lines get inline comments explaining _why_ or _what_ in plain English. The comment density is high in numerical code and low in boilerplate — comments appear where the algorithm is non-obvious, not where the syntax already tells the story. [d4b8f2a](https://github.com/karpathy/nanoGPT/commit/d4b8f2a)
+## README Documentation
 
-```python
-# from micrograd/engine.py — comments explain the calculus, not the Python
-def __mul__(self, other):
-    other = other if isinstance(other, Value) else Value(other)
-    out = Value(self.data * other.data, (self, other), '*')
-    def _backward():
-        self.grad += other.data * out.grad   # chain rule: d(a*b)/da = b
-        other.grad += self.data * out.grad   # chain rule: d(a*b)/db = a
-    out._backward = _backward
-    return out
-```
+The developer maintains exceptionally comprehensive README files that are frequently updated. These typically include:
+- Detailed setup instructions and usage examples [bd8c9d87, 695de616, 0e402260]
+- API documentation with code examples [88750810, 1a945f8b, a8101e25]
+- Links to demos and visual examples [4c3358a3, f30ddb07, ca73a1db]
+- Curated lists of community contributions and ports [350e04fe, 2eb7430e, b3c4b6c3]
 
-The pattern: no function-level docstring, but inline annotations at the points where the reader needs help. This treats the code as the primary documentation and comments as margin notes.
+They show a pattern of making frequent small updates to README files to improve user experience [bd8c9d87, 695de616, 96bbcf24], demonstrating ongoing attention to documentation quality.
 
-## Section Headers in Code
+## Language-Specific Patterns
 
-Long functions use comment lines as section dividers: `# --- forward pass ---`, `# --- loss ---`, `# --- backward pass ---`. These create a visual table of contents when scrolling through a file. [f7e2b9c](https://github.com/karpathy/nanoGPT/commit/f7e2b9c)
+The developer's commenting style varies dramatically by language:
 
-In `llm.c`, the equivalent is C-style block comments that span the full line:
+### Verbose Languages
+In [[python]], [[go]], and [[javascript]], they write extensive inline comments explaining complex logic, especially for:
+- Security-critical code [38406bcc, 9a458854]
+- Mathematical operations and algorithms [b4623bc5, 6e6a5281]
+- Machine learning implementations [9642f40b, c6c97373]
+- Academic paper references [0a20bbc1, e2fa7913, 5f49d43b]
 
-```c
-// ----------------------------------------------------------------------------
-// GPT-2 model definition
-// ----------------------------------------------------------------------------
-```
+### Minimal Documentation Languages
+In [[css]], the developer consistently avoids comments, relying instead on self-documenting class names [ca230d95, 3cc3390f, eb0eb26f]. This pattern is remarkably consistent across projects [74b4fa86, 88259a07, c8a2ab52].
 
-These dividers appear at major section boundaries — type definitions, forward pass functions, backward pass functions, training loop. They compensate for the single-file structure (see [[code-structure]]): without module boundaries, section headers are the only navigational aid. [e8c3f1a](https://github.com/karpathy/llm.c/commit/e8c3f1a)
+### Educational Content
+For teaching materials, particularly in [[jupyter-notebook]] format, they provide extensive markdown documentation between code cells, including lecture descriptions, YouTube links, and learning objectives [56eda75e, 4c355970, d0ae2af9].
 
-## Paper References
+## Self-Critical Documentation
 
-Comments frequently cite the original papers. "Attention Is All You Need", "Language Models are Unsupervised Multitask Learners" (GPT-2 paper), and specific equations are referenced by section number. This turns the code into an annotated bibliography — the reader can look up exactly which paper section a line of code implements. [b3e1a7d](https://github.com/karpathy/nanoGPT/commit/b3e1a7d)
+A distinctive trait is the developer's self-deprecating comments about code quality. They openly acknowledge hacks and express dissatisfaction with suboptimal solutions [759f7e73, c3cb157c], often soliciting improvements from others. They frequently use TODO comments to track future work [04fadeaf, ada7ef5a, ac30aa07].
 
-```python
-# causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
-# efficient attention using Flash Attention CUDA kernels
-att = F.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=self.dropout)
-```
+## Technical Documentation
 
-## README as Primary Documentation
+The developer creates specialized technical documentation files like CLAUDE.md for AI agents [eb0eb26f, 92e1fccb], showing awareness of different documentation audiences. They also maintain detailed development logs and instruction files [e6d79c12, c12eef77, 47ec1ade].
 
-Each repository's `README.md` is the sole documentation artifact. READMEs include: what the project is, how to install/run it, expected output, and architectural overview. There are no separate docs sites, no Sphinx, no generated API docs. [a1c4e7f](https://github.com/karpathy/micrograd/commit/a1c4e7f)
+## Documentation Formatting
 
-The README for nanoGPT runs to ~500 lines and includes performance benchmarks, configuration examples, and links to explanatory YouTube videos. It functions as textbook, API reference, and getting-started guide in one file. The README for micrograd is shorter but follows the same structure: diagram, explanation, quickstart.
+They use consistent formatting patterns:
+- Visual separators (---) to highlight important information [c6de374a, 13acb58d]
+- Jekyll front matter with standard metadata fields in blog posts [757d5da4, 08dc797b, 456889df]
+- Structured paper notes with consistent H1 titles and bold author names [2ed34806, 5c17572e, 8e2dce39]
+- Example-driven documentation with inline code snippets [4d8bc3c3, 9f43f9db]
 
-## Pedagogical Tone
-
-Comments are written in first person and speak directly to the reader: "we need to be careful here", "note that this is different from", "the key insight is that." The code is a teaching artifact, and comments are the lecture. [c7a2d1b](https://github.com/karpathy/micrograd/commit/c7a2d1b)
-
-```python
-# this is the key operation of the entire autograd engine.
-# during the forward pass we just do the operation.
-# the _backward closure will be called during backpropagation.
-```
-
-This tone is consistent across all repositories and distinguishes Karpathy's code from typical open-source projects, where comments explain _what_ for maintainers rather than _why_ for learners.
-
-## No Generated Documentation
-
-There are no auto-generated docs, type stubs, or API reference pages. `help(GPT)` would return nothing useful. The documentation _is_ the source code plus the README. For educational repositories where the goal is reading the code, not calling an API, this is the correct tradeoff — generated docs would create the illusion that the code is a library to be consumed, when it is actually a text to be studied.
-
-## Comment Density Scales With Algorithmic Density
-
-Comment density is not uniform — it correlates with algorithmic complexity. The attention mechanism in nanoGPT has a comment on nearly every line explaining the shape transformations. The boilerplate `__init__` methods that wire up `nn.Module` layers have no comments at all. In `llm.c`, the backward pass functions are more heavily commented than the forward pass, because the gradient computations are less intuitive. [e8c3f1a](https://github.com/karpathy/llm.c/commit/e8c3f1a)
-
-This selective density is a sign of expert commenting: annotations appear where the reader's mental model is most likely to diverge from what the code does, not where the code is longest.
+The developer explicitly documents when code is for educational or research purposes rather than production use [46aa3d5b, aeaf0b90, a54f93cc], showing responsible documentation practices.

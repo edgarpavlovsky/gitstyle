@@ -82,7 +82,7 @@ gitstyle serve [options]
 gitstyle serve
 
 # Serve an example wiki on a custom port
-gitstyle serve -w examples/anthropic --port 3000
+gitstyle serve -w examples/anthropics --port 3000
 
 # Serve without opening browser (e.g., in a remote session)
 gitstyle serve --no-open

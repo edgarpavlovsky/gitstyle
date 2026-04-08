@@ -1,119 +1,102 @@
 ---
-title: "Comments & Documentation"
-category: style
-confidence: high
-sources: [openai/openai-python, openai/openai-node, openai/tiktoken, openai/whisper, openai/CLIP, openai/openai-cookbook]
-related: [naming-conventions, type-discipline, code-structure]
-last_updated: 2026-04-07
+title: Comments and Documentation
+category: dimension
+confidence: 0.9
+source_repos:
+  - openai/CLIP
+  - openai/DALL-E
+  - openai/baselines
+  - openai/chatgpt-retrieval-plugin
+  - openai/codex
+  - openai/codex-plugin-cc
+  - openai/consistency_models
+  - openai/evals
+  - openai/gpt-2
+  - openai/gpt-3
+  - openai/gpt-oss
+  - openai/guided-diffusion
+  - openai/gym
+  - openai/jukebox
+  - openai/openai-agents-python
+  - openai/openai-cookbook
+  - openai/openai-cs-agents-demo
+  - openai/openai-node
+  - openai/openai-python
+  - openai/openai-realtime-agents
+  - openai/parameter-golf
+  - openai/point-e
+  - openai/shap-e
+  - openai/skills
+  - openai/spinningup
+  - openai/swarm
+  - openai/symphony
+  - openai/tiktoken
+  - openai/universe
+  - openai/whisper
+last_updated: 2026-04-08
 ---
+The developer demonstrates a strong commitment to comprehensive documentation across multiple levels, from high-level README files to inline code comments. Their documentation style is thorough, structured, and user-focused.
 
-# Comments & Documentation
+## Documentation Philosophy
 
-## SDK: Generated Docstrings from OpenAPI Spec
+The developer treats documentation as a first-class citizen, consistently updating it alongside code changes. They maintain documentation at multiple levels: README files for project overview and usage, inline comments for complex logic, and API documentation for public interfaces. This multi-layered approach ensures both users and maintainers can understand the codebase effectively.
 
-SDK resource methods carry comprehensive docstrings generated from the OpenAPI specification. Each parameter is documented with its type, description, and allowed values. These are not hand-written — Stainless generates them from the API spec and keeps them in sync with API changes. This makes them the densest documentation anywhere in the org. [a3f7e21](https://github.com/openai/openai-python/commit/a3f7e21)
+## README Documentation
 
-```python
-def create(
-    self,
-    *,
-    messages: Iterable[ChatCompletionMessageParam],
-    model: Union[str, ChatModel],
-    ...
-) -> ChatCompletion:
-    """Create a chat completion.
+The developer excels at creating comprehensive README files that serve as the primary entry point for understanding projects. These typically include:
 
-    Args:
-        messages: A list of messages comprising the conversation so far.
-        model: ID of the model to use. See the model endpoint compatibility
-            table for details on which models work with the Chat API.
-        frequency_penalty: Number between -2.0 and 2.0. Positive values
-            penalize new tokens based on their existing frequency.
-        ...
-    """
-```
+- Detailed setup instructions with step-by-step guides `[d89f2e34]` `[085eb81d]`
+- Code examples demonstrating usage patterns `[e32b69ee]` `[86dac6da]`
+- Experimental results with precise metrics (e.g., BPB scores to 4 decimal places) `[24438510]` `[50390d60]`
+- Hardware specifications and hyperparameter listings `[69bc84ee]` `[98556888]`
+- Installation instructions for different environments (Docker, pip, etc.) `[edfe91ec]` `[a5dbfcac]`
 
-## SDK: Sparse Inline Comments
+For specialized projects, they create structured documentation like SKILL.md files with YAML frontmatter and reference materials in separate directories `[0e7823cc]` `[5c8f1e26]`.
 
-Despite heavy docstrings, SDK implementation code has minimal inline comments. The code is expected to be self-explanatory through naming and type annotations. Comments appear only for non-obvious decisions — retry logic, SSE parsing edge cases, header manipulation. [b5d3a72](https://github.com/openai/openai-python/commit/b5d3a72)
+## API Documentation
 
-```python
-# _streaming.py — comments only where behavior is surprising
-def _iter_events(self) -> Iterator[ServerSentEvent]:
-    buf = b""
-    for chunk in self._response.iter_bytes():
-        buf += chunk
-        # SSE spec: events are separated by blank lines
-        # but some proxies strip trailing newlines, so we
-        # also split on double \n within the buffer
-        while b"\n\n" in buf:
-            event_data, buf = buf.split(b"\n\n", 1)
-            yield self._parse_event(event_data)
-```
+The developer consistently provides detailed documentation for public APIs across languages:
 
-## Research Code: Paper-Reference Comments
+- **[[python]]**: Uses Google/NumPy style docstrings with Args, Returns, and Raises sections `[63ea5f25]` `[a6b87f1a]`
+- **[[rust]]**: Writes comprehensive doc comments using `///` style, often including examples and validation notes `[e794457a]` `[35b5720e]`
+- **[[typescript]]**: Includes JSDoc comments with example code snippets `[e2b122f0]` `[e67a4fc5]`
+- **[[elixir]]**: Uses `@moduledoc` tags, though often with `@moduledoc false` for internal modules `[ff65c7c7]` `[1f86bac5]`
 
-Whisper and CLIP include comments referencing their respective papers by section or equation number, connecting implementation to academic work. This makes the code navigable for researchers reproducing results. [d4a1b38](https://github.com/openai/whisper/commit/d4a1b38) [e7f2c83](https://github.com/openai/CLIP/commit/e7f2c83)
+## Inline Comments
 
-```python
-# whisper/model.py
-class ResidualAttentionBlock(nn.Module):
-    """Corresponds to Section 2.1 of the Whisper paper.
-    Multi-head attention with residual connection and layer norm.
-    """
-    def forward(self, x, xa=None, mask=None):
-        # pre-norm formulation (Ba et al., 2016)
-        x = x + self.attn(self.attn_ln(x), mask=mask)
-        if self.cross_attn:
-            x = x + self.cross_attn(self.cross_attn_ln(x), xa)
-        x = x + self.mlp(self.mlp_ln(x))
-        return x
-```
+The developer uses inline comments judiciously, focusing on explaining:
 
-## tiktoken: The Educational Module as Living Documentation
+- Complex algorithms and non-obvious logic `[e794457a]` `[ea516f9a]`
+- Security and safety considerations `[e003f84e]` `[82506527]`
+- TODO markers for future improvements `[bbc5c482]` `[9ffdd14b]`
+- Constraints and limitations, particularly for GPU kernels `[7e31d930]`
+- Attribution when adapting code from other sources, including URLs and copyright notices `[c26852eb]`
 
-tiktoken's most distinctive documentation choice is `_educational.py` — a pure-Python reimplementation of the BPE algorithm written for clarity, not performance. The production Rust code has minimal comments; the educational module _is_ the documentation. This dual-implementation approach (fast Rust + readable Python) is rare in open source and makes tiktoken's algorithm more accessible than any amount of prose documentation could. [a4e2f91](https://github.com/openai/tiktoken/commit/a4e2f91)
+## Commit Messages
 
-```python
-# tiktoken/_educational.py
-def byte_pair_encode(mergeable_ranks, input_bytes):
-    """This is a reference implementation of BPE.
+The developer's [[commit-hygiene]] extends to documentation through detailed commit messages that follow a problem/solution format `[e794457a]` `[82506527]`. These messages often include:
 
-    It's written for clarity, not performance. The Rust implementation
-    in _tiktoken.so is ~100x faster.
+- Context explaining why changes were made
+- Validation steps and test results
+- References to external specifications or RFCs
+- Alternative approaches considered
 
-    The algorithm:
-    1. Start with individual bytes as tokens
-    2. Find the most frequent adjacent pair
-    3. Merge that pair into a new token
-    4. Repeat until no more merges are possible
-    """
-    parts = list(input_bytes)
-    while True:
-        min_rank = None
-        min_idx = None
-        for i in range(len(parts) - 1):
-            pair = parts[i] + parts[i + 1]
-            rank = mergeable_ranks.get(pair)
-            if rank is not None and (min_rank is None or rank < min_rank):
-                min_rank = rank
-                min_idx = i
-        if min_idx is None:
-            break
-        parts = parts[:min_idx] + [parts[min_idx] + parts[min_idx + 1]] + parts[min_idx + 2:]
-    return parts
-```
+## Specialized Documentation
 
-This pattern — shipping a pedagogical reimplementation alongside production code — is arguably tiktoken's most significant engineering decision. It means anyone trying to understand BPE tokenization can read real, runnable Python instead of reverse-engineering Rust or reading a paper. The educational module has become a widely-cited reference for BPE implementations in the broader ML community. See [[code-structure]] for how it fits into tiktoken's directory layout.
+For different project types, the developer adapts their documentation approach:
 
-## Cookbook: Narrative Documentation
+- **Model Cards**: Following established standards for ML models `[12766ba3]` `[c903216f]`
+- **Provider Documentation**: Creating setup guides under `docs/providers/{provider}/setup.md` `[b28ddce5]` `[b3459b11]`
+- **Multilingual Support**: Maintaining documentation in Japanese, Korean, and Chinese `[aeb653e5]` `[fa508992]`
+- **Interactive Examples**: Providing Jupyter notebooks for demonstrations `[b1c4b6be]` `[a9b1bf59]`
 
-The openai-cookbook uses Jupyter notebooks as its documentation medium. Each notebook tells a complete story with markdown cells explaining motivation, approach, and interpretation of results between code cells. The writing style is tutorial-oriented — second person, step-by-step, expected output descriptions. This is the most user-facing writing in the org, distinctly different in voice from the terse SDK docstrings. [c1d4e87](https://github.com/openai/openai-cookbook/commit/c1d4e87)
+## Documentation Maintenance
 
-## README Quality Varies by Category
+The developer actively maintains documentation freshness:
 
-SDK READMEs are comprehensive: installation, quickstart, error handling, retries, timeouts, migration guides. Research READMEs focus on model description, setup, and inference commands. Gym's README is the most extensive research README, serving as the primary reference for the `Env` interface. [f8a2c64](https://github.com/openai/openai-python/commit/f8a2c64)
+- Updates README files when making breaking changes `[cc9ce6ec]` `[c32f2aea]`
+- Includes explicit timestamps and version tracking `[d7a9bb50]` `[c903216f]`
+- Marks experimental features with clear EXPERIMENTAL markers `[fb3dcfde]` `[06d88b7e]`
+- Keeps usage instructions in sync with implementation changes `[830f9b65]` `[20f734e1]`
 
-## No Generated API Docs
-
-None of the repositories use Sphinx, MkDocs, or other documentation generators. SDK API reference lives on platform.openai.com (generated from the OpenAPI spec, not from code). Research repos rely solely on READMEs and inline comments. Triton is the only repo with Apache-2.0 per-file license headers, following LLVM convention. [b8c4d19](https://github.com/openai/openai-python/commit/b8c4d19) [b3d7e14](https://github.com/openai/triton/commit/b3d7e14)
+This comprehensive approach to documentation reflects the developer's understanding that good documentation is essential for project adoption and long-term maintainability.

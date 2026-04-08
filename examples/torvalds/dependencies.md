@@ -1,56 +1,40 @@
 ---
-title: "Dependencies"
-category: style
-confidence: high
-sources: [torvalds/linux]
-related: [code-structure, patterns, type-discipline]
-last_updated: 2026-04-07
+title: Dependencies
+category: dimension
+confidence: 0.88
+source_repos:
+  - torvalds/1590A
+  - torvalds/AudioNoise
+  - torvalds/GuitarPedal
+  - torvalds/HunspellColorize
+  - torvalds/linux
+  - torvalds/pesconvert
+  - torvalds/test-tlb
+  - torvalds/uemacs
+last_updated: 2026-04-08
 ---
+The developer demonstrates a strongly minimalist philosophy toward external dependencies across all their projects, consistently preferring to implement functionality from scratch rather than relying on third-party libraries.
 
-# Dependencies
+## Minimal External Dependencies
 
-## Philosophy: Everything In-Tree
+The developer maintains an exceptionally lean dependency footprint. In userspace projects, they rely almost exclusively on standard C libraries and POSIX system calls [bf9779cf, cea02218, d352c0df]. Even when implementing complex functionality like DSP algorithms, they prefer writing custom implementations over using established libraries [1c3e8c3b, f434a0e2, efa7475a]. This pattern extends to mathematical functions, which are implemented from scratch rather than pulled from external sources [d999fef1, b19dca57, e15140c3].
 
-The Linux kernel has zero external runtime dependencies. Every algorithm, data structure, and utility function is implemented within the source tree. There is no package manager, no dependency resolution, no vendoring — if the kernel needs it, the kernel contains it. [a8d3f2c](https://github.com/torvalds/linux/commit/a8d3f2c)
+When external libraries are absolutely necessary, the developer is highly selective. They only add dependencies for specific, essential functionality — such as libpng for PNG handling and cairo for graphics [7a54bf82, 5107cd54]. The math library (-lm) often represents their only linked dependency beyond the standard C library [fba59060].
 
-This is a deliberate architectural decision, not an accident of history. External dependencies create versioning problems, licensing complications, and security audit surface that is unacceptable for an operating system kernel. When a userspace project discovers a bug in a dependency, it updates the dependency. When the kernel needs a fix, it fixes its own code — there is no upstream to wait on, no version matrix to negotiate.
+## Platform-Specific Approaches
 
-The contrast with modern userspace development is stark. Where a Node.js project might pull in hundreds of transitive dependencies via npm, or a Python project might `pip install` a dozen packages, the kernel ships everything. This means the kernel's attack surface is fully under the control of kernel developers, and every line of code that runs in kernel context has been reviewed by the kernel community.
+In kernel development, the developer relies primarily on kernel internal APIs and subsystem-specific interfaces [3036cd0d, 86782c16, 66d64899]. They prefer platform-specific conditional compilation using #ifdef directives over external dependencies [5a28f140, c2a7e41f, c0970c42]. Feature availability is ensured through platform-specific defines like _GNU_SOURCE and _XOPEN_SOURCE rather than legacy alternatives [5a28f140].
 
-## Why Zero Dependencies Matters
+For embedded projects, the developer leverages hardware-specific SDKs like the Raspberry Pi Pico SDK, but maintains the same minimalist approach by only using essential hardware libraries (hardware_pwm, hardware_adc, hardware_i2c, hardware_watchdog) [d12d8cda, 749d90d4, b19dca57].
 
-The zero-dependency constraint is not merely philosophical — it has concrete engineering consequences. The kernel can be built on any platform with a C compiler. It can be audited as a single unit. Security patches do not require coordinating with upstream library maintainers. Version conflicts between subsystems are impossible because there is only one version of everything: the one in the tree.
+## Dependency Management Strategies
 
-This also means the kernel community must maintain its own implementations of algorithms that userspace projects take for granted — sorting, compression (LZ4, zstd, zlib are all in-tree), CRC calculation, string parsing. The maintenance cost is real, but the kernel developers consider it a worthwhile trade for complete control over every instruction that runs in ring 0.
+The developer employs different dependency management strategies based on the project context. In kernel development, they use the Kconfig system extensively with explicit select/depends statements for managing build-time configuration options and driver dependencies [61c0b2ae, 1791c390]. Complex dependency chains across subsystems are handled through careful merge ordering [3036cd0d, 86782c16, 66d64899].
 
-## Freestanding Environment
+For userspace projects, the developer transitions from hardcoded library paths to pkg-config when cleaning up initial implementations, demonstrating a preference for portable dependency management [fcf22836]. Their [[makefile]] configurations reflect this minimalist approach, using only essential system utilities and avoiding complex build systems [1ac1fc73, 4c3c754d].
 
-The kernel does not link against libc or any userspace library. It runs in a freestanding environment — no standard library, no POSIX, no runtime loader. It implements its own versions of string functions (`kstrdup`, `memcpy`, `snprintf`), memory allocation (`kmalloc`, `vmalloc`, `kzalloc`), and data structures (`list_head`, `rbtree`, `hashtable`, `xarray`). [c1e9b4d](https://github.com/torvalds/linux/commit/c1e9b4d)
+## Subsystem Boundaries
 
-These implementations are tailored to kernel constraints: no `malloc`/`free` (use `kmalloc`/`kfree` with GFP flags specifying allocation context), no `errno` (functions return negative error codes directly), no stdio (use `printk`). The kernel's `printk` does not even use floating point — the FPU is disabled in kernel context on most architectures to avoid saving/restoring FPU state on every syscall.
+In large-scale projects like the Linux kernel, the developer maintains strict subsystem boundaries with minimal cross-subsystem dependencies [3036cd0d, 86782c16, 66d64899]. They manage complex dependency trees through clear maintainer boundaries and a pull request workflow [3036cd0d, 86782c16, 66d64899], regularly updating the MAINTAINERS file to track subsystem ownership [abacaf55, 1c9982b4].
 
-Userspace-facing tools under `tools/` may link against libc, but they are maintained separately and not part of the kernel proper.
-
-## In-Tree Cryptography
-
-The kernel maintains its own crypto implementations under `crypto/` and `lib/crypto/`. Patches proposing to use OpenSSL or other external crypto libraries are rejected outright. The in-tree implementations are optimized per-architecture (AES-NI on x86, NEON on ARM) and auditable by kernel security teams. [b4f7a2e](https://github.com/torvalds/linux/commit/b4f7a2e)
-
-This extends to protocols: TLS in-kernel (kTLS), IPsec, and WireGuard all use the in-tree crypto API rather than calling out to userspace libraries. The crypto subsystem has its own test infrastructure (`CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=n`) that runs known-answer tests at boot time.
-
-## Firmware as the Exception
-
-Binary firmware blobs are the one external dependency the kernel reluctantly accepts, housed in the separate `linux-firmware` repository. Torvalds has been vocal about preferring open firmware but pragmatic about hardware vendor realities. The `request_firmware()` API isolates firmware loading from driver logic — the driver neither knows nor cares where the firmware lives on disk, and firmware loading happens through a well-defined kernel interface rather than ad-hoc file I/O. See [[patterns]] for the callback pattern used here.
-
-## In-Tree Data Structures
-
-The kernel implements its own linked lists (`list_head`), red-black trees (`rbtree`), hash tables, radix trees, and XArrays rather than using any external data structure library. These implementations are tuned for kernel-specific access patterns — for example, `list_head` is intrusive (embedded in the containing struct) to avoid separate allocation, and the rbtree implementation is augmented to support interval trees for the VM subsystem. See [[patterns]] for `container_of` usage with these structures. [f1a3d7e](https://github.com/torvalds/linux/commit/f1a3d7e)
-
-## Compiler Requirements
-
-The kernel tracks a specific minimum GCC version (currently GCC 5.1) and also supports Clang/LLVM. Compiler features are used only after they're available in the minimum supported version. New C standard features are adopted conservatively — the migration from `-std=gnu89` to `-std=gnu11` took years of preparation. See [[languages/c]] for which C features are permitted. [d9c2f1e](https://github.com/torvalds/linux/commit/d9c2f1e)
-
-## Build-Time Dependencies
-
-Build requirements are minimal: a C compiler, GNU make, and a small set of host tools (`flex`, `bison`, `bc`, `perl` for some scripts). The build system is self-contained and does not use autotools, CMake, or Meson. There is no `./configure` step — configuration is handled by Kconfig, which is itself part of the kernel source tree. See [[code-structure]] for Kbuild details. [e2d8c1f](https://github.com/torvalds/linux/commit/e2d8c1f)
-
-Even the documentation build tools (Sphinx, for rendering kernel-doc) are not required to build the kernel — they are only needed to generate HTML documentation, and their absence does not prevent compilation. The kernel can always be built with nothing beyond a compiler and make.
+This disciplined approach to dependencies aligns with their broader [[code-structure]] philosophy, emphasizing self-contained, maintainable code that minimizes external coupling. The preference for implementing functionality directly rather than importing it reflects their deep understanding of [[language-idioms]] and commitment to keeping systems lean and comprehensible.

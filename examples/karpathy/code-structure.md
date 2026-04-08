@@ -1,63 +1,93 @@
 ---
-title: "Code Structure"
-category: style
-confidence: high
-sources: [karpathy/nanoGPT, karpathy/micrograd, karpathy/llm.c, karpathy/minbpe, karpathy/makemore]
-related: [naming-conventions, patterns, dependencies]
-last_updated: 2026-04-07
+title: Code Structure
+category: dimension
+confidence: 0.9
+source_repos:
+  - karpathy/EigenLibSVM
+  - karpathy/KarpathyTalk
+  - karpathy/LLM101n
+  - karpathy/Random-Forest-Matlab
+  - karpathy/arxiv-sanity-lite
+  - karpathy/arxiv-sanity-preserver
+  - karpathy/autoresearch
+  - karpathy/build-nanogpt
+  - karpathy/calorie
+  - karpathy/char-rnn
+  - karpathy/convnetjs
+  - karpathy/covid-sanity
+  - karpathy/cryptos
+  - karpathy/deep-vector-quantization
+  - karpathy/find-birds
+  - karpathy/forestjs
+  - karpathy/hn-time-capsule
+  - karpathy/jobs
+  - karpathy/karpathy
+  - karpathy/karpathy.github.io
+  - karpathy/lecun1989-repro
+  - karpathy/llama2.c
+  - karpathy/llm-council
+  - karpathy/llm.c
+  - karpathy/makemore
+  - karpathy/micrograd
+  - karpathy/minGPT
+  - karpathy/minbpe
+  - karpathy/nanoGPT
+  - karpathy/nanochat
+  - karpathy/neuraltalk
+  - karpathy/neuraltalk2
+  - karpathy/ng-video-lecture
+  - karpathy/nipspreview
+  - karpathy/nn-zero-to-hero
+  - karpathy/notpygamejs
+  - karpathy/paper-notes
+  - karpathy/pytorch-normalizing-flows
+  - karpathy/randomfun
+  - karpathy/reader3
+  - karpathy/recurrentjs
+  - karpathy/reinforcejs
+  - karpathy/rendergit
+  - karpathy/researchlei
+  - karpathy/researchpooler
+  - karpathy/rustbpe
+  - karpathy/scholaroctopus
+  - karpathy/svmjs
+  - karpathy/tf-agent
+  - karpathy/tsnejs
+  - karpathy/twoolpy
+  - karpathy/ulogme
+last_updated: 2026-04-08
 ---
+The developer demonstrates a strong preference for modular, well-organized code structures with clear separation of concerns, though the specific approach varies by project type and language.
 
-# Code Structure
+## General Patterns
 
-## Single-File Implementations
+The developer tends to organize code into focused modules with single responsibilities. In Go projects, handlers, database operations, API logic, and middleware are separated into distinct files within an `internal/app` package structure `[a8101e25, 9a458854, 88750810]`. Similarly, in Python web applications, the developer separates concerns into distinct modules like `serve.py` for web serving, `analyze.py` for ML processing, and dedicated daemon scripts for background tasks `[7d5030b2, b0eccba7, 633fcf2d]`.
 
-The defining structural choice across Karpathy's work is radical flatness. Core implementations live in a single file — `micrograd/engine.py` (150 lines), `minbpe/basic.py` (200 lines), `nanoGPT/model.py` (300 lines), `llm.c/train_gpt2.c` (~2000 lines). The entire autograd engine, tokenizer, or transformer fits in one reading session. [a1c4e7f](https://github.com/karpathy/micrograd/commit/a1c4e7f)
+Functions are consistently kept small and focused, typically under 50 lines with clear single responsibilities `[38406bcc, eed8b1b9, 88750810]`. This pattern holds across languages, with JavaScript event handlers typically under 10 lines `[9f400b91, c030afbe]` and MATLAB functions ranging from 50-200 lines `[f7903a1e, d07d3fb5]`.
 
-This serves the pedagogical mission directly: splitting code across modules forces the reader to hold a mental import graph, which competes with the cognitive budget they need for understanding the algorithm itself. A single file means a single linear path from "what is this?" to "I understand it." Compare this to production ML codebases like Hugging Face Transformers, where the GPT-2 implementation spans a dozen files across modeling, configuration, and tokenization modules. [d4b8f2a](https://github.com/karpathy/nanoGPT/commit/d4b8f2a)
+## Language-Specific Approaches
 
-The single-file philosophy scales remarkably far. `micrograd/engine.py` at 150 lines and `llm.c/train_gpt2.c` at ~2000 lines are both single-file designs, but they solve for different constraints — one for minimal conceptual footprint, the other for keeping the entire GPT-2 forward/backward pass traceable without jumping between compilation units.
+### Python Projects
+For educational or experimental projects, the developer strongly prefers single-file implementations. The GPT implementation is kept to ~300 lines in a single file `[5af9e5c5, 803f3880]`, and training scripts often contain model definition, data loading, and training loops all in one file `[8018ed2c, ba2554ac]`. However, for production applications, the developer adopts proper modular architecture with clear separation between components `[eb0eb26f, 7d5030b2]`.
 
-## Top-to-Bottom Readability
+The developer frequently uses dataclasses for data modeling with clear hierarchical structures `[e9345a4b, 739f1013, 64960f99]` and maintains hyperparameters as module-level constants at the top of files `[28ef2875, 83f7d22b]`.
 
-Files are structured to be read linearly, like a paper. Imports come first, then configuration, then helper functions, then the main class or training loop, then `if __name__ == "__main__"` at the bottom. Each function is defined before it is used — no forward references, no "scroll up to find the definition." [f7e2b9c](https://github.com/karpathy/nanoGPT/commit/f7e2b9c)
+### JavaScript/Web Projects
+Web applications follow a standard structure with clear separation between frontend and backend. Static assets (JavaScript, CSS) are organized in dedicated directories separate from templates and backend code `[fe474d24, 8e52b8ba]`. The developer often starts with inline JavaScript and CSS in HTML files but refactors them into separate files as projects mature `[72b4719f, 0310f7e8]`.
 
-```python
-# typical file structure in micrograd/engine.py
-class Value:
-    """stores a single scalar value and its gradient"""
+For JavaScript libraries, the developer uses the module pattern with IIFE (Immediately Invoked Function Expression) for encapsulation `[6d6a4754, 88ae38ee, 2b1113e6]`, maintaining single-file libraries with clear internal organization.
 
-    def __init__(self, data, _children=(), _op=''):
-        self.data = data
-        self.grad = 0
-        self._backward = lambda: None
-        self._prev = set(_children)
-        self._op = _op
+### Low-Level Languages
+In C/CUDA projects, the developer maintains modular organization with clear separation between utilities, kernels, and main logic. Header files are used for shared functionality `[e33402f7, cb445113]`, and different implementations are kept in separate files (e.g., `run.c` for float32, `runq.c` for int8 quantization) `[d9862069, 5186b505]`.
 
-    def __add__(self, other): ...
-    def __mul__(self, other): ...
-    def backward(self): ...
-```
+## Evolution and Refactoring
 
-The ordering within a class follows the same principle: `__init__`, then operators, then the core method (`backward`). The reader never needs to jump around.
+The developer shows a clear pattern of starting with monolithic implementations and refactoring into modular structures as projects mature. This is evident in the progression from single-file notebooks to organized module structures `[e720fb1b, ac30aa07]` and the extraction of inline scripts into separate JavaScript modules `[72b4719f]`.
 
-## No Package Hierarchy
+Interestingly, the developer explicitly prefers "explicit, direct control over abstractions" and tends to remove 'magic' features like autocast in favor of explicit management `[1076f970, e569b59f]`. This philosophy extends to preferring configuration through Python files rather than YAML/JSON `[9755682b, 8aeea6d9]`.
 
-Projects are not structured as installable packages with `setup.py` or deep `src/` layouts. The root directory _is_ the project. `nanoGPT/` contains `model.py`, `train.py`, `sample.py`, `configurator.py`, and data preparation scripts — all siblings at the top level. [b3e1a7d](https://github.com/karpathy/nanoGPT/commit/b3e1a7d)
+## Documentation and Organization
 
-`llm.c` follows the same pattern in C: `train_gpt2.c`, `test_gpt2.c`, and utility files all live in the project root. No `src/` directory, no `include/` directory. See [[languages/c]] for C-specific conventions. [e8c3f1a](https://github.com/karpathy/llm.c/commit/e8c3f1a)
+The developer maintains consistent file organization patterns across projects. Blog posts follow Jekyll standards with date-prefixed naming `[757d5da4, 08dc797b]`, while educational content uses progressive, modular structures with each lecture building on previous ones `[56eda75e, 4c355970]`. Documentation files are organized in flat structures with descriptive names and dedicated image directories `[2ed34806, 5c17572e]`.
 
-This flat layout eliminates a class of questions: there is no `__init__.py` to inspect, no relative import confusion, no package path to configure. `python train.py` works from the repo root.
-
-## Data Alongside Code
-
-Data preparation scripts and small datasets live in the same repository, typically under a `data/` directory. `nanoGPT/data/shakespeare_char/` contains both the preparation script (`prepare.py`) and the generated binary files. This makes the project fully self-contained — clone and run, with no external data pipeline to set up. [c9a4d2e](https://github.com/karpathy/nanoGPT/commit/c9a4d2e)
-
-## File Size Budget
-
-No single Python file exceeds ~400 lines. When `train.py` in nanoGPT approached 350 lines, configuration handling was extracted to `configurator.py` (40 lines) rather than letting the file grow unbounded. The budget is "one file = one concept that fits in your head." [a7f3b8c](https://github.com/karpathy/nanoGPT/commit/a7f3b8c)
-
-The C code in `llm.c` breaks this budget by necessity — a single translation unit for GPT-2 training requires thousands of lines because C lacks the abstraction density of Python. The compensating strategy is aggressive use of section-header comments (see [[comments-and-docs]]) to create navigable regions within the large file.
-
-## Clone-and-Run Self-Containment
-
-Every project is designed so that `git clone` + one command produces a working result. nanoGPT includes data preparation scripts. micrograd needs nothing beyond Python itself. `llm.c` needs only `gcc`. This self-containment is a structural decision, not just convenience — it means the reader never encounters a broken setup step that derails their learning before they see a single line of the algorithm. [b3e1a7d](https://github.com/karpathy/nanoGPT/commit/b3e1a7d)
+For [[commit-hygiene]], this structured approach facilitates clear, focused commits. The modular architecture also supports the developer's [[testing]] practices by enabling isolated unit testing. The organization choices reflect strong [[language-idioms]] awareness, adapting structure to each language's conventions.
