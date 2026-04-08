@@ -142,7 +142,7 @@ tailwind.config = {
           <div class="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold"
                style="background: linear-gradient(135deg, #7c5cfc, #22d3ee); color: #0a0e1a;">g</div>
           <div>
-            <h1 class="text-sm font-bold text-text-primary tracking-wide">gitstyle</h1>
+            <h1 class="text-sm font-bold text-text-primary tracking-wide">{{ wikiName || 'gitstyle' }}</h1>
             <p class="text-[11px] text-text-muted font-normal">Engineering Style Wiki</p>
           </div>
         </div>
@@ -245,6 +245,7 @@ createApp({
   setup() {
     // ── State ──
     const files = ref([]);
+    const wikiName = ref('');
     const graphData = ref(null);
     const selectedPath = ref(null);
     const selectedArticle = ref(null); // { meta, body }
@@ -304,6 +305,11 @@ createApp({
         s += ` \u00b7 viewing: ${articleMeta.value.title || selectedPath.value}`;
       }
       return s;
+    });
+
+    // Update page title with wiki name
+    watch(wikiName, (name) => {
+      if (name) document.title = `gitstyle — ${name}`;
     });
 
     const renderedArticle = computed(() => {
@@ -724,7 +730,8 @@ createApp({
         fetch('/api/files').then(r => r.json()),
         fetch('/api/graph').then(r => r.json()),
       ]);
-      files.value = filesRes;
+      wikiName.value = filesRes.wiki_name || '';
+      files.value = filesRes.files || filesRes;
       graphData.value = graphRes;
 
       await nextTick();
@@ -740,7 +747,7 @@ createApp({
     });
 
     return {
-      files, graphData, selectedPath, selectedArticle, cdnError, graphCanvas,
+      files, wikiName, graphData, selectedPath, selectedArticle, cdnError, graphCanvas,
       groupedFiles, articleMeta, articleSources, confidenceLabel, confidenceBadgeClass,
       statusText, renderedArticle,
       sectionLabel, sectionLabelColor, dotColor, categoryBadgeClass,

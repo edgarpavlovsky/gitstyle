@@ -45,6 +45,9 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
                 meta[key] = items
             else:
                 # Try numeric
+                # Strip surrounding quotes (YAML string delimiters)
+                if len(val) >= 2 and val[0] == val[-1] and val[0] in ('"', "'"):
+                    val = val[1:-1]
                 try:
                     meta[key] = float(val) if "." in val else int(val)
                 except ValueError:
@@ -177,7 +180,10 @@ class WikiHandler(SimpleHTTPRequestHandler):
                     "slug": f["slug"],
                     "meta": f["meta"],
                 })
-            self._send_json(result)
+            self._send_json({
+                "wiki_name": self.wiki_dir.resolve().name,
+                "files": result,
+            })
             return
 
         if path.startswith("/api/file/"):

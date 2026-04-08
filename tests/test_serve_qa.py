@@ -314,10 +314,12 @@ def test_api_files_returns_list(wiki_server):
     conn.request("GET", "/api/files")
     resp = conn.getresponse()
     data = json.loads(resp.read())
-    assert isinstance(data, list)
-    assert len(data) == 3
+    assert isinstance(data, dict)
+    assert "wiki_name" in data
+    file_list = data["files"]
+    assert len(file_list) == 3
     # Body should NOT be included in file list (stripped for performance)
-    for f in data:
+    for f in file_list:
         assert "body" not in f
 
 

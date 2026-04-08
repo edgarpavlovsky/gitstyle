@@ -236,9 +236,12 @@ def test_api_files(wiki_server):
     resp = conn.getresponse()
     assert resp.status == 200
     data = json.loads(resp.read())
-    assert isinstance(data, list)
-    assert len(data) == 3
-    paths = [f["path"] for f in data]
+    assert isinstance(data, dict)
+    assert "wiki_name" in data
+    assert "files" in data
+    file_list = data["files"]
+    assert len(file_list) == 3
+    paths = [f["path"] for f in file_list]
     assert "index.md" in paths
 
 
